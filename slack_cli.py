@@ -1,7 +1,10 @@
 #! /usr/bin/env python
 
 import pathlib
+import queue
 import re
+import threading
+import xml.sax.saxutils
 
 import logzero
 import toml
@@ -12,6 +15,8 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 app = None
 channel_map = None
 user_map = None
+
+q = queue.Queue()
 
 
 def init():
@@ -36,11 +41,36 @@ def main():
     """
     global app
     config = load_config()
+    start_worker_thread(config)
     get_channels(app.client)
     get_users(app.client)
     app_token = config["oauth"]["app_token"]
     logger.info("Starting Socket-mode handler.")
     SocketModeHandler(app, app_token).start()
+    q.join()
+
+
+def display_message(msg):
+    """
+    Queue a message to be displayed.
+    """
+    q.put(("display", msg))
+
+
+def worker():
+    while True:
+        task_type, data = q.get()
+        if task_type == "display":
+            logger.info(data)
+        q.task_done()
+
+
+def start_worker_thread(config):
+    """
+    Start the thread responsible for writing to the display.
+    """
+    # Turn-on the worker thread.
+    threading.Thread(target=worker, daemon=True).start()
 
 
 def get_users(client):
@@ -79,7 +109,6 @@ def get_channels(client):
         channel_info["is_mpim"] = channel["is_mpim"]
         channel_info["is_private"] = channel["is_private"]
         channel_map[channel_id] = channel_info
-    logger.debug(channel_map)
 
 
 def load_config():
@@ -103,6 +132,20 @@ def init_app(config):
     app = App(token=user_token)
 
 
+def download_file_to_cache(team_id, file_id):
+    """
+    Download a file to ~/.cache/slackcli/${TEAM_ID}/${FILE_ID}
+    """
+    pass
+
+
+def display_file(team_id, file_id):
+    """
+    Display a file.
+    """
+    pass
+
+
 # Start your app
 if __name__ == "__main__":
     init()
@@ -111,8 +154,7 @@ if __name__ == "__main__":
 @app.message(re.compile("(.*)"))
 def handle_message(say, context):
     """
-    context looks like:
-
+    Handle plain old text messages.
     """
     global channel_map
     global user_map
@@ -122,9 +164,12 @@ def handle_message(say, context):
     user_id = context["user_id"]
     user_name = user_map[user_id]["name"]
     matches = context["matches"]
-    message = '\n'.join(matches)
-    logger.info(f"[{channel_name}][{user_name}] {message}")
-    logger.debug(context)
+    matches = [xml.sax.saxutils.unescape(m) for m in matches]
+    message = "\n".join(matches)
+    message = f"[{channel_name}][{user_name}] {message}"
+    display_message(message)
+    # logger.info(f"[{channel_name}][{user_name}] {message}")
+    # logger.debug(context)
 
 
 @app.event("message")
@@ -153,6 +198,11 @@ def handle_file_events_(event_type, body):
     """
     Handle file events.
     """
+    if event_type == "file_shared":
+        team_id = body["team_id"]
+        file_id = body["event"]["file_id"]
+        download_file_to_cache(team_id, file_id)
+        display_file(team_id, file_id)
     logger.debug(f"[{event_type}]: {body}")
 
 
