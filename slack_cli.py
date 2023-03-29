@@ -3,9 +3,12 @@
 import pathlib
 import queue
 import re
+import subprocess
+import tempfile
 import threading
 import xml.sax.saxutils
 
+import httpx
 import logzero
 import toml
 from logzero import logger
@@ -15,7 +18,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 app = None
 channel_map = None
 user_map = None
-
+image_types = frozenset(["image/jpeg", "image/png", "image/gif"])
 q = queue.Queue()
 
 
@@ -57,12 +60,56 @@ def display_message(msg):
     q.put(("display", msg))
 
 
-def worker():
+def worker(config):
     while True:
         task_type, data = q.get()
         if task_type == "display":
             logger.info(data)
+        elif task_type == "download_file":
+            worker_download_file(config, data)
         q.task_done()
+
+
+def worker_download_file(config, data):
+    """
+    Download a file.
+    """
+    global image_types
+    global channel_map
+    team_id, file_id, channel_id = data
+    channel_name = channel_map[channel_id]["name"]
+    user_token = config["oauth"]["user_token"]
+    params = {"file": file_id}
+    headers = {"Authorization": f"Bearer {user_token}"}
+    url = "https://slack.com/api/files.info"
+    r = httpx.get(url, params=params, headers=headers)
+    if r.status_code != 200:
+        logger.error(
+            f"Got status {r.status_code} when fetching metadata for file with id {file_id}."
+        )
+        return
+    json_response = r.json()
+    file_info = json_response["file"]
+    private_url = file_info["url_private"]
+    title = file_info["title"]
+    mime_type = file_info["mimetype"]
+    r = httpx.get(private_url, headers=headers)
+    if r.status_code != 200:
+        logger.error(
+            f"Got status {r.status_code} when fetching file with id {file_id}."
+        )
+        return
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        for data in r.iter_bytes():
+            f.write(data)
+        temp_name = f.name
+        logger.debug(f"mimetype: {mime_type}, image_types: {image_types}")
+        if mime_type in image_types:
+            logger.info(f"[{channel_name}] =<{title}>=")
+            cmd = ("kitty", "+kitten", "icat", temp_name)
+            logger.debug(f"cmd: {cmd}")
+            result = subprocess.run(cmd)
+            logger.debug(f"returncode: {result.returncode}")
 
 
 def start_worker_thread(config):
@@ -70,7 +117,7 @@ def start_worker_thread(config):
     Start the thread responsible for writing to the display.
     """
     # Turn-on the worker thread.
-    threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=worker, daemon=True, args=(config,)).start()
 
 
 def get_users(client):
@@ -132,18 +179,11 @@ def init_app(config):
     app = App(token=user_token)
 
 
-def download_file_to_cache(team_id, file_id):
+def display_file(team_id, file_id, channel_id):
     """
-    Download a file to ~/.cache/slackcli/${TEAM_ID}/${FILE_ID}
+    Queue file to be downloaded and displayed.
     """
-    pass
-
-
-def display_file(team_id, file_id):
-    """
-    Display a file.
-    """
-    pass
+    q.put(("download_file", (team_id, file_id, channel_id)))
 
 
 # Start your app
@@ -201,8 +241,8 @@ def handle_file_events_(event_type, body):
     if event_type == "file_shared":
         team_id = body["team_id"]
         file_id = body["event"]["file_id"]
-        download_file_to_cache(team_id, file_id)
-        display_file(team_id, file_id)
+        channel_id = body["event"]["channel_id"]
+        display_file(team_id, file_id, channel_id)
     logger.debug(f"[{event_type}]: {body}")
 
 
