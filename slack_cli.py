@@ -14,9 +14,9 @@ import toml
 from logzero import logger
 from prompt_toolkit import print_formatted_text
 from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.styles import Style
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
-from prompt_toolkit.styles import Style
 
 app = None
 channel_map = None
@@ -24,11 +24,14 @@ user_map = None
 image_types = frozenset(["image/jpeg", "image/png", "image/gif"])
 style = Style.from_dict(
     {
-        "channel": "#9370DB",
-        "user": "#ADFF2F",
+        "channel": "bg:#9370DB fg:white bold",
+        "user": "fg:#32CD32 underline",
+        "image": "fg:cyan underline",
+        "file": "fg:white underline",
     }
 )
 q = queue.Queue()
+current_channel = None
 
 
 def init():
@@ -62,23 +65,35 @@ def main():
     q.join()
 
 
-def display_message(msg):
-    """
-    Queue a message to be displayed.
-    """
-    q.put(("display", msg))
-
-
 def worker(config):
-    global style
 
     while True:
         task_type, data = q.get()
         if task_type == "display":
-            print_formatted_text(data, style=style)
+            worker_display_message(data)
         elif task_type == "download_file":
             worker_download_file(config, data)
         q.task_done()
+
+
+def worker_display_message(data):
+    """
+    Display a message.
+    """
+    global current_channel
+    global style
+    channel_id, user_id, message = data
+    global user_map
+    user_name = user_map[user_id]["name"]
+    check_display_channel(channel_id)
+    ftext = FormattedText(
+        [
+            ("class:user", f"{user_name}:"),
+            ("", " "),
+            ("", message),
+        ]
+    )
+    print_formatted_text(ftext, style=style)
 
 
 def worker_download_file(config, data):
@@ -89,7 +104,6 @@ def worker_download_file(config, data):
     global channel_map
     global style
     team_id, file_id, channel_id = data
-    channel_name = channel_map[channel_id]["name"]
     user_token = config["oauth"]["user_token"]
     params = {"file": file_id}
     headers = {"Authorization": f"Bearer {user_token}"}
@@ -116,11 +130,11 @@ def worker_download_file(config, data):
             f.write(data)
         temp_name = f.name
         logger.debug(f"mimetype: {mime_type}, image_types: {image_types}")
+        check_display_channel(channel_id)
         if mime_type in image_types:
             message = FormattedText(
                 [
-                    ("class:channel", f"[{channel_name}]"),
-                    ("", title),
+                    ("class:image", title),
                 ]
             )
             print_formatted_text(message, style=style)
@@ -128,6 +142,32 @@ def worker_download_file(config, data):
             logger.debug(f"cmd: {cmd}")
             result = subprocess.run(cmd)
             logger.debug(f"returncode: {result.returncode}")
+        else:
+            ftext = FormattedText([("class:file", title)])
+            print_formatted_text(ftext, style=style)
+
+
+def check_display_channel(channel_id):
+    """
+    Determine if the channel banner needs to be displayed.
+    Display it as needed.
+    """
+    global current_channel
+    if channel_id != current_channel:
+        display_channel_banner(channel_id)
+        current_channel = channel_id
+
+
+def display_channel_banner(channel_id):
+    """
+    Display the channel banner.
+    """
+    global channel_map
+    global style
+    channel_info = channel_map[channel_id]
+    channel_name = channel_info["name"]
+    ftext = FormattedText([("class:channel", f"{channel_name}")])
+    print_formatted_text(ftext, style=style)
 
 
 def start_worker_thread(config):
@@ -197,6 +237,13 @@ def init_app(config):
     app = App(token=user_token)
 
 
+def display_message(channel_id, user_id, msg):
+    """
+    Queue a message to be displayed.
+    """
+    q.put(("display", (channel_id, user_id, msg)))
+
+
 def display_file(team_id, file_id, channel_id):
     """
     Queue file to be downloaded and displayed.
@@ -214,24 +261,12 @@ def handle_message(say, context):
     """
     Handle plain old text messages.
     """
-    global channel_map
-    global user_map
     channel_id = context["channel_id"]
-    channel_info = channel_map[channel_id]
-    channel_name = channel_info["name"]
     user_id = context["user_id"]
-    user_name = user_map[user_id]["name"]
     matches = context["matches"]
     matches = [xml.sax.saxutils.unescape(m) for m in matches]
     message = "\n".join(matches)
-    message = FormattedText(
-        [
-            ("class:channel", f"[{channel_name}]"),
-            ("class:user", f"[{user_name}]"),
-            ("", f" {message}"),
-        ]
-    )
-    display_message(message)
+    display_message(channel_id, user_id, message)
 
 
 @app.event("message")
