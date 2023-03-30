@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "962e8c3065dcac6fb5f83649c52a788fded2fc03adeb7926c302ec8791da9fbd"
+            "sha256": "8324d3a766f9b866990caf7ebadd01e3694d602fcf7b8ba9908faf379f457cb5"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -71,6 +71,14 @@
             "index": "pypi",
             "version": "==1.7.0"
         },
+        "prompt-toolkit": {
+            "hashes": [
+                "sha256:23ac5d50538a9a38c8bde05fecb47d0b403ecd0662857a86f886f798563d5b9b",
+                "sha256:45ea77a2f7c60418850331366c81cf6b5b9cf4c7fd34616f733c5427e6abbb1f"
+            ],
+            "index": "pypi",
+            "version": "==3.0.38"
+        },
         "rfc3986": {
             "extras": [
                 "idna2008"
@@ -112,6 +120,13 @@
             ],
             "index": "pypi",
             "version": "==0.10.2"
+        },
+        "wcwidth": {
+            "hashes": [
+                "sha256:795b138f6875577cd91bba52baf9e445cd5118fd32723b460e30a0af30ea230e",
+                "sha256:a5220780a404dbe3353789870978e472cfe477761f06ee55077256e509b156d0"
+            ],
+            "version": "==0.2.6"
         }
     },
     "develop": {}

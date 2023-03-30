@@ -8,6 +8,7 @@ logzero = "*"
 slack-bolt = "*"
 toml = "*"
 httpx = "*"
+prompt-toolkit = "*"
 
 [dev-packages]
 

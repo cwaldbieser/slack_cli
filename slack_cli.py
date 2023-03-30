@@ -12,13 +12,22 @@ import httpx
 import logzero
 import toml
 from logzero import logger
+from prompt_toolkit import print_formatted_text
+from prompt_toolkit.formatted_text import FormattedText
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from prompt_toolkit.styles import Style
 
 app = None
 channel_map = None
 user_map = None
 image_types = frozenset(["image/jpeg", "image/png", "image/gif"])
+style = Style.from_dict(
+    {
+        "channel": "#9370DB",
+        "user": "#ADFF2F",
+    }
+)
 q = queue.Queue()
 
 
@@ -61,10 +70,12 @@ def display_message(msg):
 
 
 def worker(config):
+    global style
+
     while True:
         task_type, data = q.get()
         if task_type == "display":
-            logger.info(data)
+            print_formatted_text(data, style=style)
         elif task_type == "download_file":
             worker_download_file(config, data)
         q.task_done()
@@ -76,6 +87,7 @@ def worker_download_file(config, data):
     """
     global image_types
     global channel_map
+    global style
     team_id, file_id, channel_id = data
     channel_name = channel_map[channel_id]["name"]
     user_token = config["oauth"]["user_token"]
@@ -105,7 +117,13 @@ def worker_download_file(config, data):
         temp_name = f.name
         logger.debug(f"mimetype: {mime_type}, image_types: {image_types}")
         if mime_type in image_types:
-            logger.info(f"[{channel_name}] =<{title}>=")
+            message = FormattedText(
+                [
+                    ("class:channel", f"[{channel_name}]"),
+                    ("", title),
+                ]
+            )
+            print_formatted_text(message, style=style)
             cmd = ("kitty", "+kitten", "icat", temp_name)
             logger.debug(f"cmd: {cmd}")
             result = subprocess.run(cmd)
@@ -206,10 +224,14 @@ def handle_message(say, context):
     matches = context["matches"]
     matches = [xml.sax.saxutils.unescape(m) for m in matches]
     message = "\n".join(matches)
-    message = f"[{channel_name}][{user_name}] {message}"
+    message = FormattedText(
+        [
+            ("class:channel", f"[{channel_name}]"),
+            ("class:user", f"[{user_name}]"),
+            ("", f" {message}"),
+        ]
+    )
     display_message(message)
-    # logger.info(f"[{channel_name}][{user_name}] {message}")
-    # logger.debug(context)
 
 
 @app.event("message")
