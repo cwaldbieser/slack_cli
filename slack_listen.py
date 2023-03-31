@@ -1,12 +1,10 @@
 #! /usr/bin/env python
 
 import argparse
-import pathlib
 import queue
 import threading
 
 import logzero
-import toml
 from logzero import logger
 from rich.markup import escape
 from slack_bolt import App
@@ -21,6 +19,7 @@ from slackcli.channel import (
 from slackcli.console import console
 from slackcli.message import display_message_item
 from slackcli.user import get_users
+from slackcli.config import load_config
 
 app = None
 q = queue.Queue()
@@ -125,16 +124,6 @@ def start_worker_thread(config, listening):
     threading.Thread(target=worker, daemon=True, args=(config, listening)).start()
 
 
-def load_config(workspace):
-    """
-    Load config.
-    """
-    pth = pathlib.Path(f"~/.slackcli/{workspace}.toml").expanduser()
-    with open(pth, "r") as f:
-        config = toml.load(f)
-    return config
-
-
 def init_app(config):
     """
     Initialize app.
@@ -183,4 +172,7 @@ def handle_file_created_events(body, logger):
 
 # Start your app
 if __name__ == "__main__":
-    main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        pass
