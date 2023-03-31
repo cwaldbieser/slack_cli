@@ -6,7 +6,7 @@ import sys
 
 import httpx
 
-from slackcli.channel import get_channel_id_by_name, get_channels
+from slackcli.channel import get_channel_id_by_name, load_channels
 from slackcli.config import load_config
 from slackcli.user import get_users
 from slackcli.message import display_message_item
@@ -17,7 +17,7 @@ def main(args):
     The main program entrypoint.
     """
     config = load_config(args.workspace)
-    get_channels(config)
+    load_channels(config)
     get_users(config)
     channel_id = get_channel_id_by_name(args.channel)
     if channel_id is None:

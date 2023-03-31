@@ -3,19 +3,27 @@ import httpx
 channel_map_ = None
 
 
-def get_channels(config):
+def query_channels(config):
     """
-    Get channels.
+    Generator queries channels and produces entries corresponding to each one.
     """
-    global channel_map_
     url = "https://slack.com/api/conversations.list"
     user_token = config["oauth"]["user_token"]
     headers = {"Authorization": f"Bearer {user_token}"}
     response = httpx.get(url, headers=headers)
     json_response = response.json()
     channels = json_response["channels"]
-    channel_map_ = {}
     for channel in channels:
+        yield channel
+
+
+def load_channels(config):
+    """
+    Get channels.
+    """
+    global channel_map_
+    channel_map_ = {}
+    for channel in query_channels(config):
         channel_id = channel["id"]
         channel_info = {}
         is_archived = channel["is_archived"]

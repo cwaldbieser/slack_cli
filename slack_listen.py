@@ -14,7 +14,7 @@ from slackcli.channel import (
     get_all_channel_ids,
     get_channel_id_by_name,
     get_channel_info,
-    get_channels,
+    load_channels,
 )
 from slackcli.console import console
 from slackcli.message import display_message_item
@@ -47,7 +47,7 @@ def main(args):
     """
     global app
     config = load_config(args.workspace)
-    get_channels(config)
+    load_channels(config)
     get_users(config)
     listening = create_channel_filters(config)
     start_worker_thread(config, listening)
