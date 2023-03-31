@@ -5,24 +5,13 @@ import datetime
 import sys
 
 import httpx
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import FormattedText
-from prompt_toolkit.styles import Style
+from rich.markup import escape
 
 from slackcli.channel import get_channel_id_by_name, get_channels
 from slackcli.config import load_config
+from slackcli.console import console
 from slackcli.image import display_image, image_types
 from slackcli.user import get_user_info, get_users
-
-style = Style.from_dict(
-    {
-        "channel": "bg:#9370DB fg:white bold",
-        "user": "fg:#32CD32 underline",
-        "image": "fg:cyan underline",
-        "file": "fg:white underline",
-        "ts": "fg:purple",
-    }
-)
 
 
 def main(args):
@@ -57,16 +46,11 @@ def display_history_item(item, config):
     ts = item["ts"]
     dt = datetime.datetime.fromtimestamp(float(ts))
     fts = dt.strftime("%Y-%m-%d %H:%M:%S")
-    text = item["text"]
-    ftext = FormattedText(
-        [
-            ("class:user", f"[{user_name}]"),
-            ("class:ts", f"[{fts}]"),
-            ("", " "),
-            ("", text),
-        ]
+    # text = item["text"]
+    ftext = format_text_item(item)
+    console.print(
+        rf"[user]\[{escape(user_name)}][/user] [ts]\[{escape(fts)}][/ts] {ftext}"
     )
-    print_formatted_text(ftext, style=style)
     files = item.get("files", [])
     for file_info in files:
         file_id = file_info["id"]
@@ -77,8 +61,45 @@ def display_history_item(item, config):
         mimetype = file_info["mimetype"]
         if mimetype in image_types:
             display_image(config, file_id)
-        ftext = FormattedText([("class:file", name)])
-        print_formatted_text(ftext, style=style)
+        console.print(f"[file]{escape(name)}[/file]")
+
+
+def format_text_item(item):
+    """
+    Format a Slack text item.
+    Return the formatted text.
+    """
+    parts = []
+    blocks = item["blocks"]
+    for block in blocks:
+        outer_elements = block["elements"]
+        for outer_element in outer_elements:
+            inner_elements = outer_element["elements"]
+            for inner_element in inner_elements:
+                elm_type = inner_element["type"]
+                if elm_type == "text":
+                    parts.append(escape(inner_element["text"]))
+                elif elm_type == "link":
+                    text = escape(inner_element["text"])
+                    link = escape(inner_element["url"])
+                    markup = (
+                        f"[hyperlink][link={link}]{text} ({link})[/link][/hyperlink]"
+                    )
+                    parts.append(markup)
+                elif elm_type == "emoji":
+                    emoji = construct_emoji(inner_element)
+                    parts.append(emoji)
+    return "".join(parts)
+
+
+def construct_emoji(element):
+    """
+    Construct an emoji from `element`.
+    """
+    unicode_hex = element["unicode"]
+    hexes = unicode_hex.split("-")
+    parts = [chr(int(code, 16)) for code in hexes]
+    return "".join(parts)
 
 
 def get_history_for_channel(channel_id, days, config):
