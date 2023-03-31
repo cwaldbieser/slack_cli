@@ -11,7 +11,12 @@ from rich.markup import escape
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from slackcli.channel import get_channel_info, get_channels
+from slackcli.channel import (
+    get_all_channel_ids,
+    get_channel_id_by_name,
+    get_channel_info,
+    get_channels,
+)
 from slackcli.console import console
 from slackcli.message import display_message_item
 from slackcli.user import get_users
@@ -43,29 +48,50 @@ def main():
     """
     global app
     config = load_config()
-    start_worker_thread(config)
     get_channels(config)
     get_users(config)
+    listening = create_channel_filters(config)
+    start_worker_thread(config, listening)
     app_token = config["oauth"]["app_token"]
     logger.info("Starting Socket-mode handler.")
     SocketModeHandler(app, app_token).start()
     q.join()
 
 
-def worker(config):
+def create_channel_filters(config):
+    """
+    Create channel filters.
+    """
+    channel_ids = get_all_channel_ids()
+    default = {"listen_allow": "*"}
+    channels_cfg = config.get("channels", default)
+    listen_allow = channels_cfg.get("listen_allow", default["listen_allow"])
+    listen_deny = channels_cfg.get("listen_deny", [])
+    if listen_allow == "*":
+        listen_allow = channel_ids
+    else:
+        listen_allow = set([get_channel_id_by_name(chname) for chname in listen_allow])
+    listen_deny = set([get_channel_id_by_name(chname) for chname in listen_deny])
+    listening = listen_allow - listen_deny
+    return listening
+
+
+def worker(config, listening):
 
     while True:
         task_type, data = q.get()
         if task_type == "display":
-            worker_display_message(data, config)
+            worker_display_message(data, config, listening)
         q.task_done()
 
 
-def worker_display_message(data, config):
+def worker_display_message(data, config, listening):
     """
     Display a message.
     """
     channel_id, message = data
+    if channel_id not in listening:
+        return
     check_display_channel(channel_id)
     display_message_item(message, config)
 
@@ -91,12 +117,12 @@ def display_channel_banner(channel_id):
     console.rule(f"[channel]{escape(channel_name)}[/channel]")
 
 
-def start_worker_thread(config):
+def start_worker_thread(config, listening):
     """
     Start the thread responsible for writing to the display.
     """
     # Turn-on the worker thread.
-    threading.Thread(target=worker, daemon=True, args=(config,)).start()
+    threading.Thread(target=worker, daemon=True, args=(config, listening)).start()
 
 
 def load_config():

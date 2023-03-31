@@ -50,3 +50,10 @@ def get_channel_id_by_name(name):
         if channel_name == search_term:
             return channel_id
     return None
+
+
+def get_all_channel_ids():
+    """
+    Return a frozenset of all channel IDs.
+    """
+    return frozenset(channel_map_.keys())
