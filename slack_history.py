@@ -16,7 +16,7 @@ def main(args):
     """
     The main program entrypoint.
     """
-    config = load_config()
+    config = load_config(args.workspace)
     get_channels(config)
     get_users(config)
     channel_id = get_channel_id_by_name(args.channel)
@@ -54,6 +54,11 @@ def get_history_for_channel(channel_id, days, config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Display Slack history.")
+    parser.add_argument(
+        "workspace",
+        action="store",
+        help="Slack Workspace",
+    )
     parser.add_argument(
         "channel",
         action="store",

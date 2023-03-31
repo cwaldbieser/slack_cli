@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import argparse
 import pathlib
 import queue
 import threading
@@ -26,13 +27,12 @@ q = queue.Queue()
 current_channel = None
 
 
-def init():
+def init(args):
     """
     Initialize application.
     """
-    global app
     logger.info("Loading application configuration.")
-    config = load_config()
+    config = load_config(args.workspace)
     log_level = config.get("logging", {"severity": "INFO"}).get("severity", "INFO")
     if log_level in ("ERROR", "WARN", "INFO", "DEBUG"):
         severity = getattr(logzero, log_level)
@@ -42,12 +42,12 @@ def init():
     init_app(config)
 
 
-def main():
+def main(args):
     """
     Main program entrypoint.
     """
     global app
-    config = load_config()
+    config = load_config(args.workspace)
     get_channels(config)
     get_users(config)
     listening = create_channel_filters(config)
@@ -125,11 +125,11 @@ def start_worker_thread(config, listening):
     threading.Thread(target=worker, daemon=True, args=(config, listening)).start()
 
 
-def load_config():
+def load_config(workspace):
     """
     Load config.
     """
-    pth = pathlib.Path("~/.slackcli/waldbiec-dev.toml").expanduser()
+    pth = pathlib.Path(f"~/.slackcli/{workspace}.toml").expanduser()
     with open(pth, "r") as f:
         config = toml.load(f)
     return config
@@ -155,7 +155,10 @@ def queue_message(channel_id, msg):
 
 # Start your app
 if __name__ == "__main__":
-    init()
+    parser = argparse.ArgumentParser("Listen to Slack Channels")
+    parser.add_argument("workspace", action="store", help="Slack Workspace")
+    args = parser.parse_args()
+    init(args)
 
 
 @app.event("message")
@@ -180,4 +183,4 @@ def handle_file_created_events(body, logger):
 
 # Start your app
 if __name__ == "__main__":
-    main()
+    main(args)
