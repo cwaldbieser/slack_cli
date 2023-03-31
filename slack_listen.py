@@ -2,34 +2,21 @@
 
 import pathlib
 import queue
-import re
-import subprocess
-import tempfile
 import threading
-import xml.sax.saxutils
 
-import httpx
 import logzero
 import toml
 from logzero import logger
-from prompt_toolkit import print_formatted_text
-from prompt_toolkit.formatted_text import FormattedText
-from prompt_toolkit.styles import Style
+from rich.markup import escape
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
+from slackcli.channel import get_channel_info, get_channels
+from slackcli.console import console
+from slackcli.message import display_message_item
+from slackcli.user import get_users
+
 app = None
-channel_map = None
-user_map = None
-image_types = frozenset(["image/jpeg", "image/png", "image/gif"])
-style = Style.from_dict(
-    {
-        "channel": "bg:#9370DB fg:white bold",
-        "user": "fg:#32CD32 underline",
-        "image": "fg:cyan underline",
-        "file": "fg:white underline",
-    }
-)
 q = queue.Queue()
 current_channel = None
 
@@ -57,8 +44,8 @@ def main():
     global app
     config = load_config()
     start_worker_thread(config)
-    get_channels(app.client)
-    get_users(app.client)
+    get_channels(config)
+    get_users(config)
     app_token = config["oauth"]["app_token"]
     logger.info("Starting Socket-mode handler.")
     SocketModeHandler(app, app_token).start()
@@ -70,81 +57,17 @@ def worker(config):
     while True:
         task_type, data = q.get()
         if task_type == "display":
-            worker_display_message(data)
-        elif task_type == "download_file":
-            worker_download_file(config, data)
+            worker_display_message(data, config)
         q.task_done()
 
 
-def worker_display_message(data):
+def worker_display_message(data, config):
     """
     Display a message.
     """
-    global current_channel
-    global style
-    channel_id, user_id, message = data
-    global user_map
-    user_name = user_map[user_id]["name"]
+    channel_id, message = data
     check_display_channel(channel_id)
-    ftext = FormattedText(
-        [
-            ("class:user", f"{user_name}:"),
-            ("", " "),
-            ("", message),
-        ]
-    )
-    print_formatted_text(ftext, style=style)
-
-
-def worker_download_file(config, data):
-    """
-    Download a file.
-    """
-    global image_types
-    global channel_map
-    global style
-    team_id, file_id, channel_id = data
-    user_token = config["oauth"]["user_token"]
-    params = {"file": file_id}
-    headers = {"Authorization": f"Bearer {user_token}"}
-    url = "https://slack.com/api/files.info"
-    r = httpx.get(url, params=params, headers=headers)
-    if r.status_code != 200:
-        logger.error(
-            f"Got status {r.status_code} when fetching metadata for file with id {file_id}."
-        )
-        return
-    json_response = r.json()
-    file_info = json_response["file"]
-    private_url = file_info["url_private"]
-    title = file_info["title"]
-    mime_type = file_info["mimetype"]
-    r = httpx.get(private_url, headers=headers)
-    if r.status_code != 200:
-        logger.error(
-            f"Got status {r.status_code} when fetching file with id {file_id}."
-        )
-        return
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        for data in r.iter_bytes():
-            f.write(data)
-        temp_name = f.name
-        logger.debug(f"mimetype: {mime_type}, image_types: {image_types}")
-        check_display_channel(channel_id)
-        if mime_type in image_types:
-            message = FormattedText(
-                [
-                    ("class:image", title),
-                ]
-            )
-            print_formatted_text(message, style=style)
-            cmd = ("kitty", "+kitten", "icat", temp_name)
-            logger.debug(f"cmd: {cmd}")
-            result = subprocess.run(cmd)
-            logger.debug(f"returncode: {result.returncode}")
-        else:
-            ftext = FormattedText([("class:file", title)])
-            print_formatted_text(ftext, style=style)
+    display_message_item(message, config)
 
 
 def check_display_channel(channel_id):
@@ -162,12 +85,10 @@ def display_channel_banner(channel_id):
     """
     Display the channel banner.
     """
-    global channel_map
     global style
-    channel_info = channel_map[channel_id]
+    channel_info = get_channel_info(channel_id)
     channel_name = channel_info["name"]
-    ftext = FormattedText([("class:channel", f"{channel_name}")])
-    print_formatted_text(ftext, style=style)
+    console.rule(f"[channel]{escape(channel_name)}[/channel]")
 
 
 def start_worker_thread(config):
@@ -176,44 +97,6 @@ def start_worker_thread(config):
     """
     # Turn-on the worker thread.
     threading.Thread(target=worker, daemon=True, args=(config,)).start()
-
-
-def get_users(client):
-    """
-    Get users.
-    """
-    global user_map
-    user_map = {}
-    response = client.users_list()
-    users = response["members"]
-    for user in users:
-        user_id = user["id"]
-        user_info = {}
-        user_info["name"] = user["name"]
-        user_map[user_id] = user_info
-
-
-def get_channels(client):
-    """
-    Get channels.
-    """
-    global channel_map
-    response = client.conversations_list()
-    channels = response["channels"]
-    channel_map = {}
-    for channel in channels:
-        channel_id = channel["id"]
-        channel_info = {}
-        is_archived = channel["is_archived"]
-        if is_archived:
-            continue
-        channel_info["name"] = channel["name"]
-        channel_info["is_channel"] = channel["is_channel"]
-        channel_info["is_group"] = channel["is_group"]
-        channel_info["is_im"] = channel["is_im"]
-        channel_info["is_mpim"] = channel["is_mpim"]
-        channel_info["is_private"] = channel["is_private"]
-        channel_map[channel_id] = channel_info
 
 
 def load_config():
@@ -237,18 +120,11 @@ def init_app(config):
     app = App(token=user_token)
 
 
-def display_message(channel_id, user_id, msg):
+def queue_message(channel_id, msg):
     """
     Queue a message to be displayed.
     """
-    q.put(("display", (channel_id, user_id, msg)))
-
-
-def display_file(team_id, file_id, channel_id):
-    """
-    Queue file to be downloaded and displayed.
-    """
-    q.put(("download_file", (team_id, file_id, channel_id)))
+    q.put(("display", (channel_id, msg)))
 
 
 # Start your app
@@ -256,51 +132,24 @@ if __name__ == "__main__":
     init()
 
 
-@app.message(re.compile("(.*)"))
-def handle_message(say, context):
-    """
-    Handle plain old text messages.
-    """
-    channel_id = context["channel_id"]
-    user_id = context["user_id"]
-    matches = context["matches"]
-    matches = [xml.sax.saxutils.unescape(m) for m in matches]
-    message = "\n".join(matches)
-    display_message(channel_id, user_id, message)
-
-
 @app.event("message")
 def handle_message_events(body, logger):
-    handle_message_events_(body)
-
-
-def handle_message_events_(body):
-    """
-    Handle message events that don't match the standard handler.
-    """
-    logger.debug(body)
-
-
-@app.event("file_created")
-def handle_file_created_events(body, logger):
-    handle_file_events_("file_created", body)
+    event = body["event"]
+    event_subtype = event.get("subtype")
+    if event_subtype in ("message_deleted", "message_changed"):
+        return
+    channel_id = event["channel"]
+    queue_message(channel_id, event)
 
 
 @app.event("file_shared")
 def handle_file_shared_events(body, logger):
-    handle_file_events_("file_shared", body)
+    pass
 
 
-def handle_file_events_(event_type, body):
-    """
-    Handle file events.
-    """
-    if event_type == "file_shared":
-        team_id = body["team_id"]
-        file_id = body["event"]["file_id"]
-        channel_id = body["event"]["channel_id"]
-        display_file(team_id, file_id, channel_id)
-    logger.debug(f"[{event_type}]: {body}")
+@app.event("file_created")
+def handle_file_created_events(body, logger):
+    pass
 
 
 # Start your app
