@@ -19,9 +19,6 @@ oauth_config:
       - mpim:history
       - reactions:read
       - users:read
-    bot:
-      - channels:history
-      - channels:read
 settings:
   event_subscriptions:
     user_events:
