@@ -8,8 +8,8 @@ import httpx
 
 from slackcli.channel import get_channel_id_by_name, load_channels
 from slackcli.config import load_config
-from slackcli.user import get_users
 from slackcli.message import display_message_item
+from slackcli.user import get_users
 
 
 def main(args):
@@ -23,8 +23,36 @@ def main(args):
     if channel_id is None:
         print(f"Channel '{args.channel}' could not be found.")
         sys.exit(1)
-    for item in get_history_for_channel(channel_id, args.days, config):
+    if args.pins:
+        results = get_pins_for_channel(channel_id, config)
+    else:
+        results = get_history_for_channel(channel_id, args.days, config)
+    for item in results:
         display_message_item(item, config)
+
+
+def get_pins_for_channel(channel_id, config):
+    """
+    Get the pins for a channel.
+    """
+    user_token = config["oauth"]["user_token"]
+    headers = {"Authorization": f"Bearer {user_token}"}
+    url = "https://slack.com/api/pins.list"
+    params = {"channel": channel_id}
+    r = httpx.get(url, params=params, headers=headers)
+    if r.status_code != 200:
+        print(
+            f"Got status {r.status_code} when fetching"
+            f" pins for channel with id {channel_id}.",
+            file=sys.stderr,
+        )
+        return
+    json_response = r.json()
+    items = json_response["items"]
+    for item in items:
+        if item["type"] == "message":
+            message = item["message"]
+            yield message
 
 
 def get_history_for_channel(channel_id, days, config):
@@ -70,6 +98,12 @@ if __name__ == "__main__":
         default=1,
         type=int,
         help="The number of days worth of history to display.",
+    )
+    parser.add_argument(
+        "-p",
+        "--pins",
+        action="store_true",
+        help="Get posts pinned to the channel instead of normal history.",
     )
     args = parser.parse_args()
     main(args)
