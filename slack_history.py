@@ -28,7 +28,7 @@ def main(args):
     else:
         results = get_history_for_channel(channel_id, args.days, config)
     for item in results:
-        display_message_item(item, config)
+        display_message_item(item, config, show_thread_id=args.show_thread_id)
 
 
 def get_pins_for_channel(channel_id, config):
@@ -104,6 +104,12 @@ if __name__ == "__main__":
         "--pins",
         action="store_true",
         help="Get posts pinned to the channel instead of normal history.",
+    )
+    parser.add_argument(
+        "-t",
+        "--show-thread-id",
+        action="store_true",
+        help="Show the thread ID of each post.",
     )
     args = parser.parse_args()
     main(args)

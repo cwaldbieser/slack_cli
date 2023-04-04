@@ -8,7 +8,7 @@ from slackcli.image import display_image, image_types
 from slackcli.user import get_user_info
 
 
-def display_message_item(item, config):
+def display_message_item(item, config, show_thread_id=False):
     """
     Display a history item.
     """
@@ -30,9 +30,14 @@ def display_message_item(item, config):
     dt = datetime.datetime.fromtimestamp(float(ts))
     fts = dt.strftime("%Y-%m-%d %H:%M:%S")
     ftext = format_text_item(item)
-    console.print(
-        rf"[user]\[{escape(user_name)}][/user] [ts]\[{escape(fts)}][/ts] {ftext}"
-    )
+    user_part = rf"[user]\[{escape(user_name)}][/user]"
+    ts_part = rf"[ts]\[{escape(fts)}][/ts]"
+    parts = [user_part, ts_part]
+    if show_thread_id:
+        parts.append(rf"[thread]\[{escape(ts)}][/thread]")
+    parts.append(ftext)
+    message = " ".join(parts)
+    console.print(message)
     files = item.get("files", [])
     for file_info in files:
         file_id = file_info["id"]

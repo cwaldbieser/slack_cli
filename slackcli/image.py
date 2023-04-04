@@ -2,6 +2,7 @@ import subprocess
 import tempfile
 
 import httpx
+from rich import inspect
 
 image_types = frozenset(["image/jpeg", "image/png", "image/gif"])
 
@@ -18,7 +19,11 @@ def display_image(config, file_id):
     if r.status_code != 200:
         return
     json_response = r.json()
-    file_info = json_response["file"]
+    try:
+        file_info = json_response["file"]
+    except KeyError:
+        inspect(json_response)
+        raise
     private_url = file_info["url_private"]
     r = httpx.get(private_url, headers=headers)
     if r.status_code != 200:

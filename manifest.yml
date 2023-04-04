@@ -1,9 +1,5 @@
 display_information:
   name: CLI Slack bridge
-features:
-  bot_user:
-    display_name: CLI Slack bridge
-    always_online: false
 oauth_config:
   redirect_urls:
     - https://localhost:8088/
@@ -12,13 +8,16 @@ oauth_config:
       - channels:history
       - channels:read
       - files:read
+      - files:write
       - groups:history
       - im:history
       - im:read
       - links:read
       - mpim:history
+      - pins:read
       - reactions:read
       - users:read
+      - chat:write
 settings:
   event_subscriptions:
     user_events:

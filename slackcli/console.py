@@ -8,6 +8,7 @@ custom_theme = Theme(
         "image": "cyan underline",
         "file": "white underline",
         "ts": "purple",
+        "thread": "white italic",
         "hyperlink": "blue bold",
     }
 )
