@@ -7,6 +7,7 @@ oauth_config:
     user:
       - channels:history
       - channels:read
+      - chat:write
       - files:read
       - files:write
       - groups:history
@@ -17,7 +18,10 @@ oauth_config:
       - pins:read
       - reactions:read
       - users:read
-      - chat:write
+      - channels:write
+      - groups:write
+      - mpim:write
+      - im:write
 settings:
   event_subscriptions:
     user_events:
