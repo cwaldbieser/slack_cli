@@ -30,7 +30,9 @@ def main(args):
         results = get_history_for_channel(channel_id, args.days, config)
     item = None
     for item in results:
-        display_message_item(item, config, show_thread_id=args.show_thread_id)
+        display_message_item(
+            item, config, show_thread_id=args.show_thread_id, no_files=args.no_files
+        )
     if item:
         mark_read(channel_id, item["ts"], config)
 
@@ -135,6 +137,11 @@ if __name__ == "__main__":
         "--show-thread-id",
         action="store_true",
         help="Show the thread ID of each post.",
+    )
+    parser.add_argument(
+        "--no-files",
+        action="store_true",
+        help="Only show text messages.  Don't download or display files.",
     )
     args = parser.parse_args()
     main(args)
