@@ -88,11 +88,14 @@ def worker_display_message(data, config, listening):
     """
     Display a message.
     """
+    global app
     channel_id, message = data
     if channel_id not in listening:
         return
     check_display_channel(channel_id)
     display_message_item(message, config)
+    ts = message["ts"]
+    app.client.conversations_mark(channel=channel_id, ts=ts)
 
 
 def check_display_channel(channel_id):

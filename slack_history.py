@@ -5,6 +5,7 @@ import datetime
 import sys
 
 import httpx
+from rich import inspect
 
 from slackcli.channel import get_channel_id_by_name, load_channels
 from slackcli.config import load_config
@@ -27,8 +28,32 @@ def main(args):
         results = get_pins_for_channel(channel_id, config)
     else:
         results = get_history_for_channel(channel_id, args.days, config)
+    item = None
     for item in results:
         display_message_item(item, config, show_thread_id=args.show_thread_id)
+    if item:
+        mark_read(channel_id, item["ts"], config)
+
+
+def mark_read(channel_id, ts, config):
+    """
+    Mark the message identified by ``channel_id`` and ``ts`` as read.
+    """
+    user_token = config["oauth"]["user_token"]
+    headers = {"Authorization": f"Bearer {user_token}"}
+    url = "https://slack.com/api/conversations.mark"
+    params = {"channel": channel_id, "ts": ts}
+    r = httpx.post(url, params=params, headers=headers)
+    if r.status_code != 200:
+        print(
+            f"Got status {r.status_code} when fetching"
+            f" pins for channel with id {channel_id}.",
+            file=sys.stderr,
+        )
+        return
+    json_response = r.json()
+    if "errors" in json_response:
+        inspect(json_response)
 
 
 def get_pins_for_channel(channel_id, config):
