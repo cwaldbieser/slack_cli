@@ -1,4 +1,5 @@
 import httpx
+from rich import inspect
 
 user_map_ = None
 
@@ -14,7 +15,11 @@ def get_users(config):
     headers = {"Authorization": f"Bearer {user_token}"}
     response = httpx.get(url, headers=headers)
     json_response = response.json()
-    users = json_response["members"]
+    try:
+        users = json_response["members"]
+    except KeyError:
+        inspect(json_response)
+        raise
     for user in users:
         user_id = user["id"]
         user_info = {}

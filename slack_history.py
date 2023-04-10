@@ -9,6 +9,7 @@ from rich import inspect
 
 from slackcli.channel import get_channel_id_by_name, load_channels
 from slackcli.config import load_config
+from slackcli.filecache import init_filecache
 from slackcli.message import display_message_item
 from slackcli.user import get_users
 
@@ -29,10 +30,15 @@ def main(args):
     else:
         results = get_history_for_channel(channel_id, args.days, config)
     item = None
-    for item in results:
-        display_message_item(
-            item, config, show_thread_id=args.show_thread_id, no_files=args.no_files
-        )
+    with init_filecache(args.workspace) as filecache:
+        for item in results:
+            display_message_item(
+                item,
+                config,
+                filecache,
+                show_thread_id=args.show_thread_id,
+                no_files=args.no_files,
+            )
     if item:
         mark_read(channel_id, item["ts"], config)
 

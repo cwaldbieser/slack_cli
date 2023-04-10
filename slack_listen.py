@@ -16,10 +16,11 @@ from slackcli.channel import (
     get_channel_info,
     load_channels,
 )
+from slackcli.config import load_config
 from slackcli.console import console
+from slackcli.filecache import init_filecache
 from slackcli.message import display_message_item
 from slackcli.user import get_users
-from slackcli.config import load_config
 
 app = None
 q = queue.Queue()
@@ -50,7 +51,7 @@ def main(args):
     load_channels(config)
     get_users(config)
     listening = create_channel_filters(config)
-    start_worker_thread(config, listening)
+    start_worker_thread(config, args.workspace, listening)
     app_token = config["oauth"]["app_token"]
     logger.info("Starting Socket-mode handler.")
     SocketModeHandler(app, app_token).start()
@@ -75,16 +76,17 @@ def create_channel_filters(config):
     return listening
 
 
-def worker(config, listening):
+def worker(config, workspace, listening):
 
-    while True:
-        task_type, data = q.get()
-        if task_type == "display":
-            worker_display_message(data, config, listening)
-        q.task_done()
+    with init_filecache(args.workspace) as filecache:
+        while True:
+            task_type, data = q.get()
+            if task_type == "display":
+                worker_display_message(data, config, filecache, listening)
+            q.task_done()
 
 
-def worker_display_message(data, config, listening):
+def worker_display_message(data, config, filecache, listening):
     """
     Display a message.
     """
@@ -93,7 +95,7 @@ def worker_display_message(data, config, listening):
     if channel_id not in listening:
         return
     check_display_channel(channel_id)
-    display_message_item(message, config)
+    display_message_item(message, config, filecache)
     ts = message["ts"]
     app.client.conversations_mark(channel=channel_id, ts=ts)
 
@@ -119,12 +121,14 @@ def display_channel_banner(channel_id):
     console.rule(f"[channel]{escape(channel_name)}[/channel]")
 
 
-def start_worker_thread(config, listening):
+def start_worker_thread(config, workspace, listening):
     """
     Start the thread responsible for writing to the display.
     """
     # Turn-on the worker thread.
-    threading.Thread(target=worker, daemon=True, args=(config, listening)).start()
+    threading.Thread(
+        target=worker, daemon=True, args=(config, workspace, listening)
+    ).start()
 
 
 def init_app(config):

@@ -6,9 +6,10 @@ from rich.markup import escape
 from slackcli.console import console
 from slackcli.image import display_image, image_types
 from slackcli.user import get_user_info
+from slackcli.filecache import get_file
 
 
-def display_message_item(item, config, show_thread_id=False, no_files=False):
+def display_message_item(item, config, filecache, show_thread_id=False, no_files=False):
     """
     Display a history item.
     """
@@ -42,14 +43,13 @@ def display_message_item(item, config, show_thread_id=False, no_files=False):
         return
     files = item.get("files", [])
     for file_info in files:
-        file_id = file_info["id"]
-        file_mode = file_info["mode"]
-        if file_mode == "tombstone":
+        file_data = get_file(filecache, config, file_info)
+        if file_data is None:
             continue
         name = file_info["name"]
         mimetype = file_info["mimetype"]
         if mimetype in image_types:
-            display_image(config, file_id)
+            display_image(file_data)
         console.print(f"[file]{escape(name)}[/file]")
 
 
