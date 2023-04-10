@@ -9,6 +9,7 @@ slack-bolt = "*"
 toml = "*"
 httpx = "*"
 rich = "*"
+"chafa.py" = "*"
 
 [dev-packages]
 
