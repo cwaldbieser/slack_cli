@@ -1,7 +1,7 @@
+import datetime
 import pathlib
 import sqlite3
 from contextlib import contextmanager
-import datetime
 from io import BytesIO
 
 import httpx
@@ -26,10 +26,27 @@ def create_tables_(db):
     cur = db.cursor()
     sql = """\
           CREATE TABLE IF NOT EXISTS files(file_id TEXT PRIMARY KEY,
-                                                                cached NUMERIC, file_data BLOB)
+            cached NUMERIC, name TEXT, mimetype TEXT, title TEXT, file_data BLOB)
           """
     cur.execute(sql)
     db.commit()
+
+
+def insert_file_in_cache(db, file_id, binary_data, name, mimetype, title=None):
+    """
+    Inserts the file into the cache.
+    """
+    if title is None:
+        title = name
+    cached = datetime.datetime.today().timestamp()
+    sql = """\
+          REPLACE INTO files(file_id, cached, name, mimetype, title, file_data)
+          VALUES (?, ?, ?, ?, ?, ?)
+          """
+    cur = db.cursor()
+    cur.execute(sql, [file_id, cached, name, mimetype, title, binary_data])
+    db.commit()
+    return BytesIO(binary_data)
 
 
 def get_file_from_cache(db, file_id, timestamp=None):
@@ -55,21 +72,6 @@ def get_file_from_cache(db, file_id, timestamp=None):
         if cached < timestamp:
             return None
     return BytesIO(file_data)
-
-
-def insert_file_in_cache(db, file_id, binary_data):
-    """
-    Inserts the file into the cache.
-    """
-    cached = datetime.datetime.today().timestamp()
-    sql = """\
-          REPLACE INTO files(file_id, cached, file_data)
-          VALUES (?, ?, ?)
-          """
-    cur = db.cursor()
-    cur.execute(sql, [file_id, cached, binary_data])
-    db.commit()
-    return BytesIO(binary_data)
 
 
 def get_file(db, config, file_info):
@@ -101,5 +103,10 @@ def get_file(db, config, file_info):
     r = httpx.get(private_url, headers=headers)
     if r.status_code != 200:
         return None
-    file_data = insert_file_in_cache(db, file_id, r.content)
+    name = file_metadata["name"]
+    mimetype = file_metadata["mimetype"]
+    title = file_metadata.get("title")
+    file_data = insert_file_in_cache(
+        db, file_id, r.content, name, mimetype, title=title
+    )
     return file_data
