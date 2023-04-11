@@ -27,11 +27,27 @@ def main(args):
         post_message(channel_id, args, config)
 
 
+def get_message_text_(args):
+    """
+    Get the message text.
+    """
+    text_parts = []
+    args_text = args.message
+    if args_text is not None:
+        text_parts.append(args_text)
+    if args.stdin:
+        text = sys.stdin.read()
+        text_parts.append(text)
+    if len(text_parts) == 0:
+        return None
+    return "".join(text_parts)
+
+
 def post_message(channel_id, args, config):
     """
     Post a text message to a channel.
     """
-    text = args.message
+    text = get_message_text_(args)
     url = "https://slack.com/api/chat.postMessage"
     user_token = config["oauth"]["user_token"]
     headers = {"Authorization": f"Bearer {user_token}"}
@@ -58,7 +74,7 @@ def upload_and_share_file(channel_id, args, config):
     """
     Upload a file and share it to a channel with an optional initial comment.
     """
-    text = args.message
+    text = get_message_text_(args)
     kwargs = {}
     params = {
         "channels": channel_id,
@@ -119,5 +135,6 @@ if __name__ == "__main__":
         "--thread",
         help="Post in thread THREAD.",
     )
+    parser.add_argument("--stdin", action="store_true", help="Read message from STDIN.")
     args = parser.parse_args()
     main(args)
