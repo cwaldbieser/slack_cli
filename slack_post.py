@@ -47,6 +47,9 @@ def get_message_text_(args):
             text_parts.append(text)
     if len(text_parts) == 0:
         return None
+    if args.code:
+        text_parts.append("```")
+        text_parts.insert(0, "```")
     return "".join(text_parts)
 
 
@@ -164,6 +167,12 @@ if __name__ == "__main__":
         help="Post in thread THREAD.",
     )
     parser.add_argument("--stdin", action="store_true", help="Read message from STDIN.")
+    parser.add_argument(
+        "-c",
+        "--code",
+        action="store_true",
+        help="Wrap message text in Slack code mrkdwn.",
+    )
     parser.add_argument(
         "--visual",
         action="store_true",

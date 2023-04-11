@@ -36,12 +36,6 @@ def main(args):
     console.print(table)
 
 
-def display_channel(entry):
-    """
-    Display an individual channel.
-    """
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Get information about Slack channels.")
     parser.add_argument(

@@ -56,7 +56,10 @@ def display_message_item(item, config, filecache, show_thread_id=False, no_files
         mimetype = file_info["mimetype"]
         if mimetype in image_types:
             display_image(file_data)
-        console.print(f"[file]{escape(name)}[/file]")
+            console.print(f"[file]{escape(name)}[/file]")
+        else:
+            file_id = file_info["id"]
+            console.print(f"[file]{escape(name)} (file ID: {escape(file_id)})[/file]")
 
 
 def format_text_item(item):

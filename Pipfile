@@ -10,6 +10,7 @@ toml = "*"
 httpx = "*"
 rich = "*"
 "chafa.py" = "*"
+python-dateutil = "*"
 
 [dev-packages]
 

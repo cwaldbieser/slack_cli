@@ -32,6 +32,30 @@ def create_tables_(db):
     db.commit()
 
 
+def get_file_info(db, earliest=None, latest=None):
+    """
+    Generator produces information for each cached file.
+    """
+    sql = """\
+          SELECT file_id,
+                 cached,
+                 name,
+                 mimetype,
+                 title
+          FROM files
+          ORDER BY cached
+          """
+    cur = db.cursor()
+    cur.execute(sql)
+    arraysize = cur.arraysize
+    while True:
+        results = cur.fetchmany()
+        for row in results:
+            yield row
+        if len(results) != arraysize:
+            break
+
+
 def insert_file_in_cache(db, file_id, binary_data, name, mimetype, title=None):
     """
     Inserts the file into the cache.
