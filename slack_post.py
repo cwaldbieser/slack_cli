@@ -1,8 +1,11 @@
 #! /usr/bin/env python
 
 import argparse
+import os
 import pathlib
+import subprocess
 import sys
+import tempfile
 
 import httpx
 from rich import inspect
@@ -38,9 +41,34 @@ def get_message_text_(args):
     if args.stdin:
         text = sys.stdin.read()
         text_parts.append(text)
+    if args.visual:
+        text = get_text_from_visual_editor_()
+        if text is not None:
+            text_parts.append(text)
     if len(text_parts) == 0:
         return None
     return "".join(text_parts)
+
+
+def get_text_from_visual_editor_():
+    """
+    Launch a visual editor (like vim) and collect the text output from it as a
+    message.
+    """
+    visual = os.environ.get("VISUAL")
+    if visual is None:
+        return None
+    try:
+        fd, tmp_path = tempfile.mkstemp()
+        os.close(fd)
+        subprocess.call([visual, tmp_path])
+        with open(tmp_path, "r") as f:
+            text = f.read()
+            if len(text) == 0:
+                return None
+            return text
+    finally:
+        os.unlink(tmp_path)
 
 
 def post_message(channel_id, args, config):
@@ -136,5 +164,10 @@ if __name__ == "__main__":
         help="Post in thread THREAD.",
     )
     parser.add_argument("--stdin", action="store_true", help="Read message from STDIN.")
+    parser.add_argument(
+        "--visual",
+        action="store_true",
+        help="Compose message in an editor specified by the VISUAL environment variable.",
+    )
     args = parser.parse_args()
     main(args)
