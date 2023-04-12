@@ -98,19 +98,34 @@ def get_history_for_channel(channel_id, days, config):
     url = "https://slack.com/api/conversations.history"
     ts = (datetime.datetime.today() - datetime.timedelta(days)).timestamp()
     params = {"channel": channel_id, "limit": 100, "oldest": ts}
-    r = httpx.get(url, params=params, headers=headers)
-    if r.status_code != 200:
-        print(
-            f"Got status {r.status_code} when fetching"
-            f" history for channel with id {channel_id}.",
-            file=sys.stderr,
-        )
-        return
-    json_response = r.json()
-    messages = json_response["messages"]
-    messages.reverse()
-    for message in messages:
-        yield message
+    for json_response in page_results(httpx.get, url, params=params, headers=headers):
+        messages = json_response["messages"]
+        messages.reverse()
+        for message in messages:
+            yield message
+
+
+def page_results(request_func, url, params, headers):
+    """
+    Generator pages results for web API requests.
+    """
+    orig_params = dict(params)
+    while True:
+        r = request_func(url, params=params, headers=headers)
+        r.raise_for_status()
+        json_response = r.json()
+        yield json_response
+        has_more = json_response.get("has_more", False)
+        if not has_more:
+            break
+        response_metadata = json_response["response_metadata"]
+        try:
+            cursor = response_metadata["next_cursor"]
+        except KeyError:
+            inspect(response_metadata)
+            raise
+        params = dict(orig_params)
+        params["cursor"] = cursor
 
 
 if __name__ == "__main__":
