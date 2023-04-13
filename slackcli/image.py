@@ -1,5 +1,4 @@
 import contextlib
-import os
 import tempfile
 
 import chafa
@@ -42,14 +41,11 @@ def configure_pixel_mode_(config):
     """
     Configure pixel mode.
     """
-    if os.environ.get("TERM") == "xterm-kitty":
-        config.pixel_mode = chafa.PixelMode.CHAFA_PIXEL_MODE_KITTY
-    else:
-        db = chafa.TermDb()
-        terminfo = db.detect()
-        term_caps = terminfo.detect_capabilities()
-        config.pixel_mode = term_caps.pixel_mode
-        config.canvas_mode = term_caps.canvas_mode
+    db = chafa.TermDb()
+    terminfo = db.detect()
+    term_caps = terminfo.detect_capabilities()
+    config.pixel_mode = term_caps.pixel_mode
+    config.canvas_mode = term_caps.canvas_mode
 
 
 @contextlib.contextmanager
