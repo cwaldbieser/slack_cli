@@ -38,6 +38,7 @@ style = Style.from_dict(
 )
 
 bindings = KeyBindings()
+file_bindings = KeyBindings()
 
 
 def main(args):
@@ -145,6 +146,22 @@ def handle_debug(event):
     run_in_terminal(debug_events_)
 
 
+@file_bindings.add("c-c")
+def handle_file_ctrl_c(event):
+    """
+    Handle CTRL-C by exiting the prompt.
+    """
+    event.app.exit("")
+
+
+@file_bindings.add("c-d")
+def handle_file_ctrl_d(event):
+    """
+    Handle CTRL-D by exiting the prompt.
+    """
+    event.app.exit("")
+
+
 def select_channel_name(default_channel_id):
     """
     Allow current channel to be selected interactively.
@@ -239,6 +256,7 @@ def do_repl(channel_id, args, config):
         "file > ",
         vi_mode=True,
         completer=PathCompleter(expanduser=True),
+        key_bindings=file_bindings,
     )
     text = ""
     while True:
@@ -279,6 +297,8 @@ def validate_and_share_file(channel_id, config, path):
     """
     Validate and share a file.
     """
+    if path == "":
+        return
     pathobj = pathlib.Path(path).expanduser()
     if not pathobj.is_file():
         console.print(
