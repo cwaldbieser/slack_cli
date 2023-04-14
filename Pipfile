@@ -11,6 +11,7 @@ httpx = "*"
 rich = "*"
 "chafa.py" = "*"
 python-dateutil = "*"
+prompt-toolkit = "*"
 
 [dev-packages]
 

@@ -6,6 +6,7 @@ import threading
 
 import logzero
 from logzero import logger
+from rich import inspect
 from rich.markup import escape
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -95,7 +96,11 @@ def worker_display_message(data, config, filecache, listening):
     if channel_id not in listening:
         return
     check_display_channel(channel_id)
-    display_message_item(message, config, filecache)
+    try:
+        display_message_item(message, config, filecache)
+    except Exception as ex:
+        inspect(ex)
+        inspect(message)
     ts = message["ts"]
     app.client.conversations_mark(channel=channel_id, ts=ts)
 

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5f0c875074b7955f2ee1e4df2fd12bee7c1a08691960998520545c191e103e29"
+            "sha256": "74823b0607c94d4f77f78ee712b96613ed37b5a9846bb8205471e28deccc2b29"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -115,6 +115,14 @@
             "markers": "python_version >= '3.7'",
             "version": "==0.1.2"
         },
+        "prompt-toolkit": {
+            "hashes": [
+                "sha256:23ac5d50538a9a38c8bde05fecb47d0b403ecd0662857a86f886f798563d5b9b",
+                "sha256:45ea77a2f7c60418850331366c81cf6b5b9cf4c7fd34616f733c5427e6abbb1f"
+            ],
+            "index": "pypi",
+            "version": "==3.0.38"
+        },
         "pygments": {
             "hashes": [
                 "sha256:77a3299119af881904cd5ecd1ac6a66214b6e9bed1f2db16993b54adede64094",
@@ -149,19 +157,19 @@
         },
         "slack-bolt": {
             "hashes": [
-                "sha256:93b819955337e5ceaaa6871a06ef5f816b6376abc16a3080c0e7240487bc3bcb",
-                "sha256:ca051f7c62346ecea4b363379de9357844b4f6c8b0c9d0784664d2543d47d42a"
+                "sha256:a0aa6b09d94ca5bd7be2284abcb3d19e90ccf6c69c2bc61df15d7a750065b331",
+                "sha256:f80811c55e332b58adecf13209f3758ca2a76e66ce1d54d9b5031df0f98ffbdd"
             ],
             "index": "pypi",
-            "version": "==1.17.0"
+            "version": "==1.17.1"
         },
         "slack-sdk": {
             "hashes": [
-                "sha256:552c6961293da524def64e012543bc4b8859f96fa8780f016de6daf8abeb1c1c",
-                "sha256:c5452d0bfa8cb716103522e51f695efac8d62af20d95e419b8c3265525941405"
+                "sha256:276358fcddaec49895bea50174e4bd7f83d53b74b917de03ca511e145c6e75d2",
+                "sha256:451f2394f6d3696d08c9b290844332aab6e8e39473327fc3f7d19794c7eb441d"
             ],
             "markers": "python_full_version >= '3.6.0'",
-            "version": "==3.21.0"
+            "version": "==3.21.1"
         },
         "sniffio": {
             "hashes": [
@@ -178,6 +186,13 @@
             ],
             "index": "pypi",
             "version": "==0.10.2"
+        },
+        "wcwidth": {
+            "hashes": [
+                "sha256:795b138f6875577cd91bba52baf9e445cd5118fd32723b460e30a0af30ea230e",
+                "sha256:a5220780a404dbe3353789870978e472cfe477761f06ee55077256e509b156d0"
+            ],
+            "version": "==0.2.6"
         }
     },
     "develop": {}

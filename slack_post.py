@@ -8,6 +8,7 @@ import sys
 import tempfile
 
 import httpx
+from prompt_toolkit import prompt
 from rich import inspect
 
 from slackcli.channel import get_channel_id_by_name, load_channels
@@ -24,10 +25,32 @@ def main(args):
     if channel_id is None:
         print(f"Channel '{args.channel}' could not be found.")
         sys.exit(1)
-    if args.file is not None:
+    if args.repl:
+        do_repl(channel_id, args, config)
+    elif args.file is not None:
         upload_and_share_file(channel_id, args, config)
     else:
-        post_message(channel_id, args, config)
+        text = get_message_text_(args)
+        post_message(channel_id, args, config, text)
+
+
+def do_repl(channel_id, args, config):
+    """
+    Accept messages from a prompt in a loop.
+    vi bindings are used by default.
+    An editor can be launched by "v" in normal mode.
+    """
+    while True:
+        text = prompt(
+            "message > ",
+            vi_mode=True,
+            multiline=True,
+            prompt_continuation="> ",
+            enable_open_in_editor=True,
+        )
+        if text == "":
+            break
+        post_message(channel_id, args, config, text)
 
 
 def get_message_text_(args):
@@ -46,7 +69,14 @@ def get_message_text_(args):
         if text is not None:
             text_parts.append(text)
     if len(text_parts) == 0:
-        return None
+        text = prompt(
+            "message > ",
+            vi_mode=True,
+            multiline=True,
+            prompt_continuation="> ",
+            enable_open_in_editor=True,
+        )
+        text_parts.append(text)
     if args.code:
         text_parts.append("```")
         text_parts.insert(0, "```")
@@ -74,11 +104,10 @@ def get_text_from_visual_editor_():
         os.unlink(tmp_path)
 
 
-def post_message(channel_id, args, config):
+def post_message(channel_id, args, config, text):
     """
     Post a text message to a channel.
     """
-    text = get_message_text_(args)
     url = "https://slack.com/api/chat.postMessage"
     user_token = config["oauth"]["user_token"]
     headers = {"Authorization": f"Bearer {user_token}"}
@@ -177,6 +206,12 @@ if __name__ == "__main__":
         "--visual",
         action="store_true",
         help="Compose message in an editor specified by the VISUAL environment variable.",
+    )
+    parser.add_argument(
+        "-r",
+        "--repl",
+        action="store_true",
+        help="Compose messages using a Read-Eval-Print Loop.",
     )
     args = parser.parse_args()
     main(args)
