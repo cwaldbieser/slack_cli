@@ -11,6 +11,7 @@ from textwrap import dedent
 import httpx
 from prompt_toolkit import PromptSession, prompt
 from prompt_toolkit.application import run_in_terminal
+from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import radiolist_dialog
 
@@ -18,6 +19,7 @@ from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.styles import Style
 from rich import inspect
 from rich.markdown import Markdown
+from rich.markup import escape
 
 from slackcli.channel import get_channel_id_by_name, get_channels_by_type, load_channels
 from slackcli.config import load_config
@@ -27,6 +29,7 @@ RESULT_QUIT = 0
 RESULT_HELP = 1
 RESULT_CHANNEL_SWITCH = 2
 RESULT_MULTILINE = 3
+RESULT_FILE = 5
 
 style = Style.from_dict(
     {
@@ -120,6 +123,14 @@ def handle_multiline(event):
     event.app.exit(RESULT_MULTILINE)
 
 
+@bindings.add("f4")
+def handle_file(event):
+    """
+    Handle uploading a file.
+    """
+    event.app.exit(RESULT_FILE)
+
+
 @bindings.add("f6")
 def handle_debug(event):
     """
@@ -188,6 +199,7 @@ def print_repl_help():
     - F1 this help.
     - F2 to switch channels.
     - F3 to toggle multi-line mode.
+    - F4 to upload a file.
     - CTRL-C or CTRL-D to exit
 
     In vi *normal mode* use common vi bindings:
@@ -200,10 +212,6 @@ def print_repl_help():
     md = Markdown(markdown)
     console.print(md)
     console.print("")
-
-
-def handle_app_render_(app):
-    print("handle_app_render_()")
 
 
 def do_repl(channel_id, args, config):
@@ -226,6 +234,11 @@ def do_repl(channel_id, args, config):
         bottom_toolbar=bottom_toolbar,
         style=style,
         key_bindings=bindings,
+    )
+    file_session = PromptSession(
+        "file > ",
+        vi_mode=True,
+        completer=PathCompleter(expanduser=True),
     )
     text = ""
     while True:
@@ -253,7 +266,27 @@ def do_repl(channel_id, args, config):
             multiline = not multiline
             tbconfig["multiline"] = multiline
             continue
+        elif result == RESULT_FILE:
+            buffer = session.default_buffer
+            text = buffer.text
+            file_result = file_session.prompt()
+            validate_and_share_file(channel_id, config, file_result)
+            continue
         post_message(channel_id, args, config, result)
+
+
+def validate_and_share_file(channel_id, config, path):
+    """
+    Validate and share a file.
+    """
+    pathobj = pathlib.Path(path).expanduser()
+    if not pathobj.is_file():
+        console.print(
+            f"[error]ERROR:[/error] '[file]{escape(path)}[/file]' is not a file."
+        )
+        return
+    with open(pathobj, "rb") as f:
+        upload_and_share_file_impl_(channel_id, config, f)
 
 
 def get_message_text_(args):
@@ -338,22 +371,32 @@ def upload_and_share_file(channel_id, args, config):
     Upload a file and share it to a channel with an optional initial comment.
     """
     text = get_message_text_(args)
+    upload_and_share_file_impl_(
+        channel_id, config, args.file, thread_ts=args.thread, initial_comment=text
+    )
+
+
+def upload_and_share_file_impl_(
+    channel_id, config, fileobj, thread_ts=None, initial_comment=None
+):
+    """
+    Implemention for uploading and sharing a file.
+    """
     kwargs = {}
     params = {
         "channels": channel_id,
     }
-    if text:
-        params["initial_comment"] = text
-    if args.thread:
-        params["thread_ts"] = args.thread
-    if args.file:
-        pth = pathlib.Path(args.file.name)
-        filename = pth.name
-        kwargs["files"] = {
-            "file": args.file,
-        }
-        params["filename"] = filename
-        params["title"] = filename
+    if initial_comment is not None:
+        params["initial_comment"] = initial_comment
+    if thread_ts is not None:
+        params["thread_ts"] = thread_ts
+    pth = pathlib.Path(fileobj.name)
+    filename = pth.name
+    kwargs["files"] = {
+        "file": fileobj,
+    }
+    params["filename"] = filename
+    params["title"] = filename
     url = "https://slack.com/api/files.upload"
     user_token = config["oauth"]["user_token"]
     headers = {"Authorization": f"Bearer {user_token}"}
