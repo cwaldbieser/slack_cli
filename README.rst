@@ -4,9 +4,11 @@
 
 Simple CLI tools for interacting with Slack.
 
--  ``slack_listen``: Listen for interactive Slack messages.
--  ``slack_history``: Retrieve old messages for a channel.
--  ``slack_channels``: List Slack channels.
+-  ``slack_channels.py``: List Slack channels.
+-  ``slack_files.py``: List and manipulate files downloaded from Slack to the file cache.
+-  ``slack_history.py``: Display old messages for a channel.
+-  ``slack_listen.py``: Listen for interactive Slack messages.
+-  ``slack_post.py``: Send messages and / or files to a Slack channel.
 
 *************************
  Deploying the Slack App
@@ -36,3 +38,4 @@ your App, in the section "OAuth Tokens for Your Workspace".
 
 These tokens need to be included in you workspace configuration file--
 ``$HOME/.slackcli/$WORKSPACE.toml``.
+
