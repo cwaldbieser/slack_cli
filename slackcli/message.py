@@ -100,7 +100,9 @@ def construct_emoji(element):
     """
     Construct an emoji from `element`.
     """
-    unicode_hex = element["unicode"]
+    unicode_hex = element.get("unicode")
+    if unicode_hex is None:
+        return f":{element['name']}:"
     hexes = unicode_hex.split("-")
     parts = [chr(int(code, 16)) for code in hexes]
     return "".join(parts)
