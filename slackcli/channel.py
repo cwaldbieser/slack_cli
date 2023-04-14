@@ -65,3 +65,23 @@ def get_all_channel_ids():
     Return a frozenset of all channel IDs.
     """
     return frozenset(channel_map_.keys())
+
+
+def get_channels_by_type(channel_type):
+    """
+    Generator produces tuples of (channel_id, channel_name).
+    """
+    global channel_map_
+    for channel_id, channel_info in channel_map_.items():
+        is_channel = channel_info["is_channel"]
+        is_group = channel_info["is_group"]
+        is_im = channel_info["is_im"]
+        is_mpim = channel_info["is_mpim"]
+        if channel_type == "channel" and is_channel:
+            yield (channel_id, channel_info["name"])
+        elif channel_type == "group" and is_group:
+            yield (channel_id, channel_info["name"])
+        elif channel_type == "im" and is_im:
+            yield (channel_id, channel_info["name"])
+        elif channel_type == "mpim" and is_mpim:
+            yield (channel_id, channel_info["name"])

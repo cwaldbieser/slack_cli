@@ -9,10 +9,25 @@ import tempfile
 
 import httpx
 from prompt_toolkit import prompt
+
+# from prompt_toolkit.application import run_in_terminal
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.shortcuts import radiolist_dialog
+
+# from prompt_toolkit.key_binding.bindings.vi import vi_navigation_mode
+from prompt_toolkit.styles import Style
 from rich import inspect
 
-from slackcli.channel import get_channel_id_by_name, load_channels
+from slackcli.channel import get_channel_id_by_name, get_channels_by_type, load_channels
 from slackcli.config import load_config
+
+style = Style.from_dict(
+    {
+        "bottom-toolbar": "#ffffff bg:#333333",
+    }
+)
+
+bindings = KeyBindings()
 
 
 def main(args):
@@ -34,23 +49,102 @@ def main(args):
         post_message(channel_id, args, config, text)
 
 
+def make_toolbar_func(tbconfig):
+    """
+    Make a toolbar function.
+    """
+
+    def bottom_toolbar():
+        channel_name = tbconfig["channel_name"]
+        return [("class:bottom-toolbar", f" channel: {channel_name}")]
+
+    return bottom_toolbar
+
+
+@bindings.add("c-d")
+def handle_ctrl_d(event):
+    """
+    Handle CTRL-D by exiting.
+    """
+    event.app.exit(0)
+
+
+@bindings.add("c-c")
+def handle_ctrl_c(event):
+    """
+    Handle CTRL-C by exiting.
+    """
+    event.app.exit(0)
+
+
+@bindings.add("<sigint>")
+def handle_sigint(event):
+    """
+    Handle CTRL-C by exiting.
+    """
+    event.app.exit(0)
+
+
+@bindings.add("f1")
+def handle_change_channel(event):
+    """
+    Handle changing the channel.
+    """
+    event.app.exit(1)
+
+
+def select_channel_name(default_channel_id):
+    """
+    Allow current channel to be selected interactively.
+    """
+    channels = {
+        channel_id: channel_name
+        for (channel_id, channel_name) in get_channels_by_type("channel")
+    }
+    values = list(channels.items())
+    values.sort(key=lambda x: x[1])
+    channel_id = radiolist_dialog(
+        title="Channels",
+        text="Choose a channel.",
+        values=values,
+        default=default_channel_id,
+    ).run()
+    if channel_id is None:
+        channel_id = default_channel_id
+    return channel_id, channels[channel_id]
+
+
 def do_repl(channel_id, args, config):
     """
     Accept messages from a prompt in a loop.
     vi bindings are used by default.
     An editor can be launched by "v" in normal mode.
     """
+    global style
+    tbconfig = {"channel_name": args.channel}
+    bottom_toolbar = make_toolbar_func(tbconfig)
+    result_quit = 0
+    result_channel_switch = 1
     while True:
-        text = prompt(
+        result = prompt(
             "message > ",
             vi_mode=True,
             multiline=True,
             prompt_continuation="> ",
             enable_open_in_editor=True,
+            bottom_toolbar=bottom_toolbar,
+            style=style,
+            key_bindings=bindings,
         )
-        if text == "":
+        if result == "":
             break
-        post_message(channel_id, args, config, text)
+        elif result == result_quit:
+            break
+        elif result == result_channel_switch:
+            channel_id, channel_name = select_channel_name(channel_id)
+            tbconfig["channel_name"] = channel_name
+            continue
+        post_message(channel_id, args, config, result)
 
 
 def get_message_text_(args):
