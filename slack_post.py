@@ -6,20 +6,26 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+from textwrap import dedent
 
 import httpx
-from prompt_toolkit import prompt
-
-# from prompt_toolkit.application import run_in_terminal
+from prompt_toolkit import PromptSession, prompt
+from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.shortcuts import radiolist_dialog
 
 # from prompt_toolkit.key_binding.bindings.vi import vi_navigation_mode
 from prompt_toolkit.styles import Style
 from rich import inspect
+from rich.markdown import Markdown
 
 from slackcli.channel import get_channel_id_by_name, get_channels_by_type, load_channels
 from slackcli.config import load_config
+from slackcli.console import console
+
+RESULT_QUIT = 0
+RESULT_HELP = 1
+RESULT_CHANNEL_SWITCH = 2
 
 style = Style.from_dict(
     {
@@ -66,7 +72,7 @@ def handle_ctrl_d(event):
     """
     Handle CTRL-D by exiting.
     """
-    event.app.exit(0)
+    event.app.exit(RESULT_QUIT)
 
 
 @bindings.add("c-c")
@@ -74,7 +80,7 @@ def handle_ctrl_c(event):
     """
     Handle CTRL-C by exiting.
     """
-    event.app.exit(0)
+    event.app.exit(RESULT_QUIT)
 
 
 @bindings.add("<sigint>")
@@ -82,15 +88,37 @@ def handle_sigint(event):
     """
     Handle CTRL-C by exiting.
     """
-    event.app.exit(0)
+    event.app.exit(RESULT_QUIT)
 
 
 @bindings.add("f1")
+def handle_help(event):
+    """
+    Handle Help.
+    """
+    event.app.exit(RESULT_HELP)
+
+
+@bindings.add("f2")
 def handle_change_channel(event):
     """
     Handle changing the channel.
     """
-    event.app.exit(1)
+    event.app.exit(RESULT_CHANNEL_SWITCH)
+
+
+@bindings.add("f6")
+def handle_debug(event):
+    """
+    Handle debugging.
+    """
+
+    def debug_events_():
+        inspect(event)
+        buffer = event.current_buffer
+        inspect(buffer)
+
+    run_in_terminal(debug_events_)
 
 
 def select_channel_name(default_channel_id):
@@ -114,6 +142,56 @@ def select_channel_name(default_channel_id):
     return channel_id, channels[channel_id]
 
 
+def print_repl_header():
+    """
+    Print the REPL header.
+    """
+    markdown = dedent(
+        """\
+    # Post Messages to Slack
+
+    - F1 for help
+    - CTRL-D to exit
+    """
+    )
+    md = Markdown(markdown)
+    console.print(md)
+    console.print("")
+
+
+def print_repl_help():
+    """
+    Print REPL help.
+    """
+    markdown = dedent(
+        """\
+    # Help for Posting Messages to Slack REPL
+
+    Type messages at the prompt using vi bindings.
+    In multiline mode, you must type ESC-ENTER to post a message.
+
+    The following special keys and key combinations are available:
+
+    - F1 this help.
+    - F2 to switch channels.
+    - CTRL-C or CTRL-D to exit
+
+    In vi *normal mode* use common vi bindings:
+
+    - Movements like `w`, `e`, `b`.
+    - Beginning and end of line `0` and `$`.
+    - Edit text in editor specified in `$EDITOR` by pressing `v`.
+    """
+    )
+    md = Markdown(markdown)
+    console.print(md)
+    console.print("")
+
+
+def handle_app_render_(app):
+    print("handle_app_render_()")
+
+
 def do_repl(channel_id, args, config):
     """
     Accept messages from a prompt in a loop.
@@ -123,24 +201,33 @@ def do_repl(channel_id, args, config):
     global style
     tbconfig = {"channel_name": args.channel}
     bottom_toolbar = make_toolbar_func(tbconfig)
-    result_quit = 0
-    result_channel_switch = 1
+    print_repl_header()
+    session = PromptSession(
+        "message > ",
+        vi_mode=True,
+        multiline=True,
+        prompt_continuation="> ",
+        enable_open_in_editor=True,
+        bottom_toolbar=bottom_toolbar,
+        style=style,
+        key_bindings=bindings,
+    )
+    text = ""
     while True:
-        result = prompt(
-            "message > ",
-            vi_mode=True,
-            multiline=True,
-            prompt_continuation="> ",
-            enable_open_in_editor=True,
-            bottom_toolbar=bottom_toolbar,
-            style=style,
-            key_bindings=bindings,
-        )
+        result = session.prompt(default=text)
+        text = ""
         if result == "":
             break
-        elif result == result_quit:
+        elif result == RESULT_QUIT:
             break
-        elif result == result_channel_switch:
+        elif result == RESULT_HELP:
+            buffer = session.default_buffer
+            text = buffer.text
+            print_repl_help()
+            continue
+        elif result == RESULT_CHANNEL_SWITCH:
+            buffer = session.default_buffer
+            text = buffer.text
             channel_id, channel_name = select_channel_name(channel_id)
             tbconfig["channel_name"] = channel_name
             continue
