@@ -11,9 +11,8 @@ from textwrap import dedent
 import httpx
 from prompt_toolkit import PromptSession, prompt
 from prompt_toolkit.application import run_in_terminal
-from prompt_toolkit.completion import PathCompleter
+from prompt_toolkit.completion import PathCompleter, WordCompleter
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.shortcuts import radiolist_dialog
 
 # from prompt_toolkit.key_binding.bindings.vi import vi_navigation_mode
 from prompt_toolkit.styles import Style
@@ -38,7 +37,7 @@ style = Style.from_dict(
 )
 
 bindings = KeyBindings()
-file_bindings = KeyBindings()
+stop_bindings = KeyBindings()
 
 
 def main(args):
@@ -146,7 +145,7 @@ def handle_debug(event):
     run_in_terminal(debug_events_)
 
 
-@file_bindings.add("c-c")
+@stop_bindings.add("c-c")
 def handle_file_ctrl_c(event):
     """
     Handle CTRL-C by exiting the prompt.
@@ -154,7 +153,7 @@ def handle_file_ctrl_c(event):
     event.app.exit("")
 
 
-@file_bindings.add("c-d")
+@stop_bindings.add("c-d")
 def handle_file_ctrl_d(event):
     """
     Handle CTRL-D by exiting the prompt.
@@ -162,25 +161,16 @@ def handle_file_ctrl_d(event):
     event.app.exit("")
 
 
-def select_channel_name(default_channel_id):
+def make_channel_completer():
     """
-    Allow current channel to be selected interactively.
+    Create a channel completer.
     """
-    channels = {
-        channel_id: channel_name
+    channel_map = {
+        channel_name: channel_id
         for (channel_id, channel_name) in get_channels_by_type("channel")
     }
-    values = list(channels.items())
-    values.sort(key=lambda x: x[1])
-    channel_id = radiolist_dialog(
-        title="Channels",
-        text="Choose a channel.",
-        values=values,
-        default=default_channel_id,
-    ).run()
-    if channel_id is None:
-        channel_id = default_channel_id
-    return channel_id, channels[channel_id]
+    completer = WordCompleter(channel_map.keys(), ignore_case=True)
+    return completer, channel_map
 
 
 def print_repl_header():
@@ -239,7 +229,8 @@ def do_repl(channel_id, args, config):
     """
     global style
     multiline = False
-    tbconfig = {"channel_name": args.channel, "multiline": multiline}
+    channel_name = args.channel
+    tbconfig = {"channel_name": channel_name, "multiline": multiline}
     bottom_toolbar = make_toolbar_func(tbconfig)
     print_repl_header()
     session = PromptSession(
@@ -256,7 +247,14 @@ def do_repl(channel_id, args, config):
         "file > ",
         vi_mode=True,
         completer=PathCompleter(expanduser=True),
-        key_bindings=file_bindings,
+        key_bindings=stop_bindings,
+    )
+    channel_completer, channel_id_map = make_channel_completer()
+    channel_session = PromptSession(
+        "channel > ",
+        vi_mode=True,
+        completer=channel_completer,
+        key_bindings=stop_bindings,
     )
     text = ""
     while True:
@@ -274,7 +272,10 @@ def do_repl(channel_id, args, config):
         elif result == RESULT_CHANNEL_SWITCH:
             buffer = session.default_buffer
             text = buffer.text
-            channel_id, channel_name = select_channel_name(channel_id)
+            channel_result = channel_session.prompt(default=channel_name)
+            channel_id, channel_name = validate_channel(
+                channel_result, channel_id_map, default=(channel_id, channel_name)
+            )
             tbconfig["channel_name"] = channel_name
             continue
         elif result == RESULT_MULTILINE:
@@ -291,6 +292,16 @@ def do_repl(channel_id, args, config):
             validate_and_share_file(channel_id, config, file_result)
             continue
         post_message(channel_id, args, config, result)
+
+
+def validate_channel(channel_name, channel_id_map, default=None):
+    """
+    Validate a channel name and return
+    """
+    channel_id = channel_id_map.get(channel_name)
+    if channel_id is None:
+        return default
+    return channel_id, channel_name
 
 
 def validate_and_share_file(channel_id, config, path):
