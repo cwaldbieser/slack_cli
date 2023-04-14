@@ -26,6 +26,7 @@ from slackcli.console import console
 RESULT_QUIT = 0
 RESULT_HELP = 1
 RESULT_CHANNEL_SWITCH = 2
+RESULT_MULTILINE = 3
 
 style = Style.from_dict(
     {
@@ -62,7 +63,11 @@ def make_toolbar_func(tbconfig):
 
     def bottom_toolbar():
         channel_name = tbconfig["channel_name"]
-        return [("class:bottom-toolbar", f" channel: {channel_name}")]
+        multiline = tbconfig["multiline"]
+        toolbar = [
+            ("class:bottom-toolbar", f"multiline: {multiline}  channel: {channel_name}")
+        ]
+        return toolbar
 
     return bottom_toolbar
 
@@ -105,6 +110,14 @@ def handle_change_channel(event):
     Handle changing the channel.
     """
     event.app.exit(RESULT_CHANNEL_SWITCH)
+
+
+@bindings.add("f3")
+def handle_multiline(event):
+    """
+    Handle toggline multiline mode.
+    """
+    event.app.exit(RESULT_MULTILINE)
 
 
 @bindings.add("f6")
@@ -174,6 +187,7 @@ def print_repl_help():
 
     - F1 this help.
     - F2 to switch channels.
+    - F3 to toggle multi-line mode.
     - CTRL-C or CTRL-D to exit
 
     In vi *normal mode* use common vi bindings:
@@ -199,13 +213,14 @@ def do_repl(channel_id, args, config):
     An editor can be launched by "v" in normal mode.
     """
     global style
-    tbconfig = {"channel_name": args.channel}
+    multiline = False
+    tbconfig = {"channel_name": args.channel, "multiline": multiline}
     bottom_toolbar = make_toolbar_func(tbconfig)
     print_repl_header()
     session = PromptSession(
         "message > ",
         vi_mode=True,
-        multiline=True,
+        multiline=multiline,
         prompt_continuation="> ",
         enable_open_in_editor=True,
         bottom_toolbar=bottom_toolbar,
@@ -214,7 +229,7 @@ def do_repl(channel_id, args, config):
     )
     text = ""
     while True:
-        result = session.prompt(default=text)
+        result = session.prompt(default=text, multiline=multiline)
         text = ""
         if result == "":
             break
@@ -230,6 +245,13 @@ def do_repl(channel_id, args, config):
             text = buffer.text
             channel_id, channel_name = select_channel_name(channel_id)
             tbconfig["channel_name"] = channel_name
+            continue
+        elif result == RESULT_MULTILINE:
+            buffer = session.default_buffer
+            text = buffer.text
+            multiline = tbconfig["multiline"]
+            multiline = not multiline
+            tbconfig["multiline"] = multiline
             continue
         post_message(channel_id, args, config, result)
 
