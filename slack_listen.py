@@ -21,7 +21,7 @@ from slackcli.config import load_config
 from slackcli.console import console
 from slackcli.filecache import init_filecache
 from slackcli.message import display_message_item
-from slackcli.user import get_users
+from slackcli.user import get_user_info, get_users
 
 app = None
 q = queue.Queue()
@@ -93,11 +93,17 @@ def worker_display_message(data, config, filecache, listening):
     """
     global app
     channel_id, message = data
-    if channel_id not in listening:
-        return
-    check_display_channel(channel_id)
+    conversation_id = channel_id
+    channel_type = message.get("channel_type")
+    if channel_type == "im":
+        user_id = message["user"]
+        conversation_id = user_id
+    else:
+        if channel_id not in listening:
+            return
+    check_display_channel(conversation_id, channel_type)
     try:
-        display_message_item(message, config, filecache)
+        display_message_item(message, config, filecache, show_thread_id=True)
     except Exception as ex:
         inspect(ex)
         inspect(message)
@@ -105,24 +111,30 @@ def worker_display_message(data, config, filecache, listening):
     app.client.conversations_mark(channel=channel_id, ts=ts)
 
 
-def check_display_channel(channel_id):
+def check_display_channel(channel_id, channel_type):
     """
     Determine if the channel banner needs to be displayed.
     Display it as needed.
     """
     global current_channel
     if channel_id != current_channel:
-        display_channel_banner(channel_id)
+        display_channel_banner(channel_id, channel_type)
         current_channel = channel_id
 
 
-def display_channel_banner(channel_id):
+def display_channel_banner(channel_id, channel_type):
     """
     Display the channel banner.
     """
     global style
-    channel_info = get_channel_info(channel_id)
-    channel_name = channel_info["name"]
+    if channel_type == "im":
+        inspect(channel_id)
+        user_info = get_user_info(channel_id)
+        user_name = user_info["name"]
+        channel_name = f"DM from {user_name}"
+    else:
+        channel_info = get_channel_info(channel_id)
+        channel_name = channel_info["name"]
     console.rule(f"[channel]{escape(channel_name)}[/channel]")
 
 
