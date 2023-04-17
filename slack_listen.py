@@ -21,7 +21,7 @@ from slackcli.config import load_config
 from slackcli.console import console
 from slackcli.filecache import init_filecache
 from slackcli.message import display_message_item
-from slackcli.user import get_user_info, get_users
+from slackcli.user import get_user_info, load_users
 
 app = None
 q = queue.Queue()
@@ -50,7 +50,7 @@ def main(args):
     global app
     config = load_config(args.workspace)
     load_channels(config)
-    get_users(config)
+    load_users(config)
     listening = create_channel_filters(config)
     start_worker_thread(config, args.workspace, listening)
     app_token = config["oauth"]["app_token"]
@@ -128,7 +128,6 @@ def display_channel_banner(channel_id, channel_type):
     """
     global style
     if channel_type == "im":
-        inspect(channel_id)
         user_info = get_user_info(channel_id)
         user_name = user_info["name"]
         channel_name = f"DM from {user_name}"

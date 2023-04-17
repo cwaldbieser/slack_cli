@@ -11,7 +11,7 @@ from slackcli.channel import get_channel_id_by_name, load_channels
 from slackcli.config import load_config
 from slackcli.filecache import init_filecache
 from slackcli.message import display_message_item
-from slackcli.user import get_users
+from slackcli.user import load_users
 
 
 def main(args):
@@ -20,7 +20,7 @@ def main(args):
     """
     config = load_config(args.workspace)
     load_channels(config)
-    get_users(config)
+    load_users(config)
     channel_id = get_channel_id_by_name(args.channel)
     if channel_id is None:
         print(f"Channel '{args.channel}' could not be found.")

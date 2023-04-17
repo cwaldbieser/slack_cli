@@ -4,7 +4,7 @@ from rich import inspect
 user_map_ = None
 
 
-def get_users(config):
+def load_users(config):
     """
     Get users.
     """
@@ -25,6 +25,14 @@ def get_users(config):
         user_info = {}
         user_info["name"] = user["name"]
         user_map_[user_id] = user_info
+
+
+def get_all_users():
+    """
+    Generator yields (user_id, user_info).
+    """
+    for user_id, user_info in user_map_.items():
+        yield user_id, user_info
 
 
 def get_user_info(user_id):

@@ -23,12 +23,14 @@ from rich.markup import escape
 from slackcli.channel import get_channel_id_by_name, get_channels_by_type, load_channels
 from slackcli.config import load_config
 from slackcli.console import console
+from slackcli.user import get_all_users, load_users
 
 RESULT_QUIT = 0
 RESULT_HELP = 1
-RESULT_CHANNEL_SWITCH = 2
-RESULT_MULTILINE = 3
-RESULT_FILE = 5
+RESULT_MULTILINE = 2
+RESULT_FILE = 3
+RESULT_CHANNEL_SWITCH = 4
+RESULT_DM_SWITCH = 5
 
 style = Style.from_dict(
     {
@@ -46,6 +48,7 @@ def main(args):
     """
     config = load_config(args.workspace)
     load_channels(config)
+    load_users(config)
     channel_id = get_channel_id_by_name(args.channel)
     if channel_id is None:
         print(f"Channel '{args.channel}' could not be found.")
@@ -66,9 +69,17 @@ def make_toolbar_func(tbconfig):
 
     def bottom_toolbar():
         channel_name = tbconfig["channel_name"]
+        channel_type = tbconfig["channel_type"]
         multiline = tbconfig["multiline"]
+        if channel_type == "dm":
+            channel_type_label = "DM"
+        else:
+            channel_type_label = "channel"
         toolbar = [
-            ("class:bottom-toolbar", f"multiline: {multiline}  channel: {channel_name}")
+            (
+                "class:bottom-toolbar",
+                f"multiline: {multiline}  {channel_type_label}: {channel_name}",
+            )
         ]
         return toolbar
 
@@ -108,14 +119,6 @@ def handle_help(event):
 
 
 @bindings.add("f2")
-def handle_change_channel(event):
-    """
-    Handle changing the channel.
-    """
-    event.app.exit(RESULT_CHANNEL_SWITCH)
-
-
-@bindings.add("f3")
 def handle_multiline(event):
     """
     Handle toggline multiline mode.
@@ -123,12 +126,28 @@ def handle_multiline(event):
     event.app.exit(RESULT_MULTILINE)
 
 
-@bindings.add("f4")
+@bindings.add("f3")
 def handle_file(event):
     """
     Handle uploading a file.
     """
     event.app.exit(RESULT_FILE)
+
+
+@bindings.add("f4")
+def handle_change_channel(event):
+    """
+    Handle changing the channel.
+    """
+    event.app.exit(RESULT_CHANNEL_SWITCH)
+
+
+@bindings.add("f16")
+def handle_change_dm(event):
+    """
+    Handle changing the DM.
+    """
+    event.app.exit(RESULT_DM_SWITCH)
 
 
 @bindings.add("f6")
@@ -173,6 +192,18 @@ def make_channel_completer():
     return completer, channel_map
 
 
+def make_dm_completer():
+    """
+    Create a DM completer.
+    """
+    user_map = {
+        channel_info["name"]: channel_id
+        for (channel_id, channel_info) in get_all_users()
+    }
+    completer = WordCompleter(user_map.keys(), ignore_case=True)
+    return completer, user_map
+
+
 def print_repl_header():
     """
     Print the REPL header.
@@ -204,9 +235,10 @@ def print_repl_help():
     The following special keys and key combinations are available:
 
     - F1 this help.
-    - F2 to switch channels.
-    - F3 to toggle multi-line mode.
-    - F4 to upload a file.
+    - F2 to toggle multi-line mode.
+    - F3 to upload a file.
+    - F4 to switch channels.
+    - F16 to switch DMs.
     - CTRL-C or CTRL-D to exit
 
     In vi *normal mode* use common vi bindings:
@@ -230,7 +262,11 @@ def do_repl(channel_id, args, config):
     global style
     multiline = False
     channel_name = args.channel
-    tbconfig = {"channel_name": channel_name, "multiline": multiline}
+    tbconfig = {
+        "channel_name": channel_name,
+        "multiline": multiline,
+        "channel_type": "channel",
+    }
     bottom_toolbar = make_toolbar_func(tbconfig)
     print_repl_header()
     session = PromptSession(
@@ -256,6 +292,13 @@ def do_repl(channel_id, args, config):
         completer=channel_completer,
         key_bindings=stop_bindings,
     )
+    dm_completer, dm_id_map = make_dm_completer()
+    dm_session = PromptSession(
+        "user > ",
+        vi_mode=True,
+        completer=dm_completer,
+        key_bindings=stop_bindings,
+    )
     text = ""
     while True:
         result = session.prompt(default=text, multiline=multiline)
@@ -277,6 +320,17 @@ def do_repl(channel_id, args, config):
                 channel_result, channel_id_map, default=(channel_id, channel_name)
             )
             tbconfig["channel_name"] = channel_name
+            tbconfig["channel_type"] = "channel"
+            continue
+        elif result == RESULT_DM_SWITCH:
+            buffer = session.default_buffer
+            text = buffer.text
+            dm_result = dm_session.prompt(default=channel_name)
+            channel_id, channel_name = validate_dm(
+                dm_result, dm_id_map, default=(channel_id, channel_name)
+            )
+            tbconfig["channel_name"] = channel_name
+            tbconfig["channel_type"] = "dm"
             continue
         elif result == RESULT_MULTILINE:
             buffer = session.default_buffer
@@ -302,6 +356,16 @@ def validate_channel(channel_name, channel_id_map, default=None):
     if channel_id is None:
         return default
     return channel_id, channel_name
+
+
+def validate_dm(user_name, user_id_map, default=None):
+    """
+    Validate a user name and return
+    """
+    user_id = user_id_map.get(user_name)
+    if user_id is None:
+        return default
+    return user_id, user_name
 
 
 def validate_and_share_file(channel_id, config, path):
