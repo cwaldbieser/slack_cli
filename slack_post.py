@@ -315,20 +315,36 @@ def do_repl(channel_id, args, config):
         elif result == RESULT_CHANNEL_SWITCH:
             buffer = session.default_buffer
             text = buffer.text
-            channel_result = channel_session.prompt(default=channel_name)
-            channel_id, channel_name = validate_channel(
+            channel_type = tbconfig["channel_type"]
+            if channel_type == "channel":
+                kwargs = {"default": channel_name}
+            else:
+                kwargs = {}
+            channel_result = channel_session.prompt(**kwargs)
+            validate_result = validate_channel(
                 channel_result, channel_id_map, default=(channel_id, channel_name)
             )
+            if validate_result is None:
+                continue
+            channel_id, channel_name = validate_result
             tbconfig["channel_name"] = channel_name
             tbconfig["channel_type"] = "channel"
             continue
         elif result == RESULT_DM_SWITCH:
             buffer = session.default_buffer
             text = buffer.text
-            dm_result = dm_session.prompt(default=channel_name)
-            channel_id, channel_name = validate_dm(
+            channel_type = tbconfig["channel_type"]
+            if channel_type == "dm":
+                kwargs = {"default": channel_name}
+            else:
+                kwargs = {}
+            dm_result = dm_session.prompt(**kwargs)
+            validate_result = validate_dm(
                 dm_result, dm_id_map, default=(channel_id, channel_name)
             )
+            if validate_result is None:
+                continue
+            channel_id, channel_name = validate_result
             tbconfig["channel_name"] = channel_name
             tbconfig["channel_type"] = "dm"
             continue
