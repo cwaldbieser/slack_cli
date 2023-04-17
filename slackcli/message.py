@@ -3,6 +3,7 @@ import datetime
 from rich import inspect
 from rich.markup import escape
 
+from slackcli.channel import get_channel_info
 from slackcli.console import console
 from slackcli.filecache import get_file
 from slackcli.image import display_image, image_types
@@ -93,7 +94,39 @@ def format_text_item(item):
                 elif elm_type == "emoji":
                     emoji = construct_emoji(inner_element)
                     parts.append(emoji)
+                elif elm_type == "user":
+                    user = construct_user(inner_element)
+                    parts.append(user)
+                elif elm_type == "channel":
+                    channel = construct_channel(inner_element)
+                    parts.append(channel)
     return "".join(parts)
+
+
+def construct_channel(element):
+    """
+    Construct a channel from a message element.
+    """
+    channel_id = element["channel_id"]
+    channel_info = get_channel_info(channel_id)
+    if channel_info is None:
+        channel = channel_id
+    else:
+        channel = channel_info["name"]
+    return f"[channel]#{escape(channel)}[/channel]"
+
+
+def construct_user(element):
+    """
+    Construct a user from a message element.
+    """
+    user_id = element["user_id"]
+    user_info = get_user_info(user_id)
+    if user_info is None:
+        username = user_id
+    else:
+        username = user_info["name"]
+    return f"[user]@{escape(username)}[/user]"
 
 
 def construct_emoji(element):
