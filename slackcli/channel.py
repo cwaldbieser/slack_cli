@@ -17,6 +17,19 @@ def query_channels(config):
         yield channel
 
 
+def load_dm_info(config, dm_id):
+    """
+    Loads and returns DM info for the DM channel identified by `dm_id`.
+    """
+    url = "https://slack.com/api/conversations.info"
+    user_token = config["oauth"]["user_token"]
+    headers = {"Authorization": f"Bearer {user_token}"}
+    params = {"channel": dm_id}
+    response = httpx.get(url, headers=headers, params=params)
+    json_response = response.json()
+    return json_response["channel"]
+
+
 def load_channels(config):
     """
     Get channels.

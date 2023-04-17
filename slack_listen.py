@@ -16,6 +16,7 @@ from slackcli.channel import (
     get_channel_id_by_name,
     get_channel_info,
     load_channels,
+    load_dm_info,
 )
 from slackcli.config import load_config
 from slackcli.console import console
@@ -26,6 +27,7 @@ from slackcli.user import get_user_info, load_users
 app = None
 q = queue.Queue()
 current_channel = None
+dm_map_ = {}
 
 
 def init(args):
@@ -93,15 +95,11 @@ def worker_display_message(data, config, filecache, listening):
     """
     global app
     channel_id, message = data
-    conversation_id = channel_id
     channel_type = message.get("channel_type")
-    if channel_type == "im":
-        user_id = message["user"]
-        conversation_id = user_id
-    else:
+    if channel_type != "im":
         if channel_id not in listening:
             return
-    check_display_channel(conversation_id, channel_type)
+    check_display_channel(config, channel_id, channel_type)
     try:
         display_message_item(message, config, filecache, show_thread_id=True)
     except Exception as ex:
@@ -111,26 +109,30 @@ def worker_display_message(data, config, filecache, listening):
     app.client.conversations_mark(channel=channel_id, ts=ts)
 
 
-def check_display_channel(channel_id, channel_type):
+def check_display_channel(config, channel_id, channel_type):
     """
     Determine if the channel banner needs to be displayed.
     Display it as needed.
     """
     global current_channel
     if channel_id != current_channel:
-        display_channel_banner(channel_id, channel_type)
+        display_channel_banner(config, channel_id, channel_type)
         current_channel = channel_id
 
 
-def display_channel_banner(channel_id, channel_type):
+def display_channel_banner(config, channel_id, channel_type):
     """
     Display the channel banner.
     """
     global style
+    global dm_map_
+
     if channel_type == "im":
-        user_info = get_user_info(channel_id)
+        channel_info = load_dm_info(config, channel_id)
+        user_id = channel_info["user"]
+        user_info = get_user_info(user_id)
         user_name = user_info["name"]
-        channel_name = f"DM from {user_name}"
+        channel_name = f"DM with {user_name}"
     else:
         channel_info = get_channel_info(channel_id)
         channel_name = channel_info["name"]
