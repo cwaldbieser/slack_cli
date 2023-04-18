@@ -26,7 +26,16 @@ def load_users(config):
         if deleted:
             continue
         user_info = {}
-        user_info["name"] = user["name"]
+        fields = [
+            "name",
+            "is_admin",
+            "is_bot",
+            "is_owner",
+            "is_primary_owner",
+            "tz",
+        ]
+        for field in fields:
+            user_info[field] = user[field]
         user_map_[user_id] = user_info
 
 
