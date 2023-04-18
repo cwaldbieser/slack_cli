@@ -7,21 +7,23 @@ oauth_config:
     user:
       - channels:history
       - channels:read
+      - channels:write
       - chat:write
       - files:read
       - files:write
       - groups:history
+      - groups:read
+      - groups:write
       - im:history
       - im:read
+      - im:write
       - links:read
       - mpim:history
+      - mpim:write
       - pins:read
       - reactions:read
       - users:read
-      - channels:write
-      - groups:write
-      - mpim:write
-      - im:write
+      - mpim:read
 settings:
   event_subscriptions:
     user_events:
@@ -37,3 +39,4 @@ settings:
   org_deploy_enabled: false
   socket_mode_enabled: true
   token_rotation_enabled: false
+
