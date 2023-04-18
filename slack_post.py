@@ -23,7 +23,7 @@ from rich.markup import escape
 from slackcli.channel import get_channel_id_by_name, get_channels_by_type, load_channels
 from slackcli.config import load_config
 from slackcli.console import console
-from slackcli.user import get_all_users, load_users
+from slackcli.user import get_all_users, get_user_id_by_username, load_users
 
 RESULT_QUIT = 0
 RESULT_HELP = 1
@@ -49,9 +49,15 @@ def main(args):
     config = load_config(args.workspace)
     load_channels(config)
     load_users(config)
-    channel_id = get_channel_id_by_name(args.channel)
+    if not args.dm:
+        channel_id = get_channel_id_by_name(args.channel)
+    else:
+        channel_id = get_user_id_by_username(args.channel)
     if channel_id is None:
-        print(f"Channel '{args.channel}' could not be found.")
+        if args.dm:
+            print(f"User '{args.channel}' could not be found.")
+        else:
+            print(f"Channel '{args.channel}' could not be found.")
         sys.exit(1)
     if args.repl:
         do_repl(channel_id, args, config)
@@ -262,10 +268,13 @@ def do_repl(channel_id, args, config):
     global style
     multiline = False
     channel_name = args.channel
+    channel_type = "channel"
+    if args.dm:
+        channel_type = "dm"
     tbconfig = {
         "channel_name": channel_name,
         "multiline": multiline,
-        "channel_type": "channel",
+        "channel_type": channel_type,
     }
     bottom_toolbar = make_toolbar_func(tbconfig)
     print_repl_header()
@@ -535,6 +544,12 @@ if __name__ == "__main__":
         "channel",
         action="store",
         help="The name of the channel to which the post will be sent.",
+    )
+    parser.add_argument(
+        "--dm",
+        action="store_true",
+        help="Post a direct message instead of posting to a channel."
+        "  A username should be provided for the CHANNEL argument.",
     )
     parser.add_argument(
         "-m",

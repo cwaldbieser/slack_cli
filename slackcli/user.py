@@ -53,3 +53,13 @@ def get_user_info(user_id):
     """
     global user_map_
     return user_map_.get(user_id)
+
+
+def get_user_id_by_username(username):
+    """
+    Get the user_id matching the given username.
+    """
+    for user_id, user_info in user_map_.items():
+        if user_info["name"] == username:
+            return user_id
+    return None
