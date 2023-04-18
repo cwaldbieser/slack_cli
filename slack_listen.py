@@ -179,7 +179,7 @@ if __name__ == "__main__":
 def handle_message_events(body, logger):
     event = body["event"]
     event_subtype = event.get("subtype")
-    if event_subtype in ("message_deleted", "message_changed"):
+    if event_subtype in ("message_deleted", "message_changed", "channel_join"):
         return
     channel_id = event["channel"]
     queue_message(channel_id, event)
