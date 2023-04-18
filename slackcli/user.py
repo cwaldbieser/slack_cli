@@ -22,6 +22,9 @@ def load_users(config):
         raise
     for user in users:
         user_id = user["id"]
+        deleted = user["deleted"]
+        if deleted:
+            continue
         user_info = {}
         user_info["name"] = user["name"]
         user_map_[user_id] = user_info
